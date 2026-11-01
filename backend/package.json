@@ -1,18 +1,44 @@
 {
   "name": "@doska/backend",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.2.0",
   "type": "module",
-  "description": "Бэкенд «Учебной доски»: REST API, WebSocket (Yjs), авторизация. Код сервиса появится на этапе 2.",
+  "description": "Бэкенд «Учебной доски»: REST API, WebSocket (Yjs), авторизация",
+  "main": "dist/src/main.js",
   "scripts": {
+    "dev": "sh scripts/with-env.sh tsx watch src/main.ts",
+    "start": "node dist/src/main.js",
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "postinstall": "prisma generate",
     "prisma:validate": "DATABASE_URL=${DATABASE_URL:-postgresql://validate:validate@localhost:5432/validate} prisma validate",
     "prisma:format": "prisma format",
-    "prisma:generate": "prisma generate"
+    "prisma:generate": "prisma generate",
+    "db:migrate:dev": "sh scripts/with-env.sh prisma migrate dev",
+    "db:migrate": "sh scripts/with-env.sh prisma migrate deploy",
+    "db:seed": "sh scripts/with-env.sh tsx prisma/seed.ts",
+    "db:seed:prod": "node dist/prisma/seed.js"
   },
   "dependencies": {
-    "@prisma/client": "6.19.3"
+    "@doska/shared": "0.1.0",
+    "@fastify/cookie": "11.1.5",
+    "@fastify/helmet": "13.2.0",
+    "@fastify/rate-limit": "11.2.1",
+    "@prisma/client": "6.19.3",
+    "argon2": "0.45.1",
+    "fastify": "5.12.7",
+    "fastify-plugin": "6.0.1",
+    "jose": "6.2.14",
+    "zod": "3.25.76"
   },
   "devDependencies": {
-    "prisma": "6.19.3"
+    "@types/node": "22.20.5",
+    "pino-pretty": "13.2.0",
+    "prisma": "6.19.3",
+    "tsx": "4.23.15",
+    "typescript": "5.9.3",
+    "vitest": "3.2.7"
   }
 }

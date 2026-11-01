@@ -1,7 +1,7 @@
 {
   "name": "doska",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Учебная доска: интерактивная бесконечная доска для занятий по математике и физике",
   "workspaces": [
     "packages/shared",
@@ -11,10 +11,14 @@
     "node": ">=22"
   },
   "scripts": {
-    "build": "npm run build -w @doska/shared",
-    "test": "npm run test -w @doska/shared",
-    "typecheck": "npm run typecheck -w @doska/shared",
+    "build:shared": "npm run build -w @doska/shared",
+    "build": "npm run build:shared && npm run build -w @doska/backend",
+    "typecheck": "npm run build:shared && npm run typecheck -w @doska/shared && npm run typecheck -w @doska/backend",
+    "test": "npm run build:shared && npm run test -w @doska/shared && npm run test -w @doska/backend",
     "prisma:validate": "npm run prisma:validate -w @doska/backend",
-    "check": "npm run typecheck && npm run test && npm run build && npm run prisma:validate"
+    "check": "npm run typecheck && npm run test && npm run build && npm run prisma:validate",
+    "dev:backend": "npm run dev -w @doska/backend",
+    "db:migrate": "npm run db:migrate -w @doska/backend",
+    "db:seed": "npm run db:seed -w @doska/backend"
   }
 }
