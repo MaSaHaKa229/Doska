@@ -18,6 +18,7 @@ import type { AuditService } from '../common/audit.js';
 import type { AppEvents } from '../common/events.js';
 import { auditBase, type Actor } from '../common/actor.js';
 import { loadBoardAccess } from './access.js';
+import { loadWorkInfo } from './work-info.js';
 import { createInitialDocState } from '../realtime/doc.js';
 
 export interface BoardUser {
@@ -64,7 +65,6 @@ export class BoardsService {
       mode: b.mode,
       owner: { id: b.owner.id, fullName: b.owner.fullName },
       folderId: b.ownerId === user.id ? b.folderId : null,
-      thumbnailUrl: null,
       objectCount: b.objectCount,
       pageCount: b.pageCount,
       lastActivityAt: b.lastActivityAt.toISOString(),
@@ -72,6 +72,7 @@ export class BoardsService {
       role: this.roleFor(b, user),
       classes: b.classAccess.map((a) => ({ id: a.class.id, name: a.class.name })),
       studentCount: b.members.filter((m) => m.role === 'STUDENT').length,
+      sharedWithTeachers: b.sharedWithTeachers,
     };
   }
 
@@ -83,7 +84,6 @@ export class BoardsService {
         kind: 'LESSON',
         classAccess: { some: { class: { archivedAt: null, members: { some: { userId: user.id, role: 'STUDENT' } } } } },
       });
-      or.push({ kind: 'ASSIGNMENT_WORK', assignmentWork: { studentId: user.id } });
     }
     if (user.role === 'TEACHER') {
       // Открытые конспекты учеников из классов учителя.
@@ -102,7 +102,7 @@ export class BoardsService {
 
   async list(user: BoardUser, q: ListBoardsQuery): Promise<Paginated<BoardSummary>> {
     const and: Prisma.BoardWhereInput[] = [{ deletedAt: null }];
-    // Работы учеников по заданиям показываются в разделе заданий (этап 4.2), не в общем списке.
+    // Работы по заданиям показываются в разделе «Задания» (учителю и ученику), не в общем списке досок.
     const ownWhere: Prisma.BoardWhereInput = { ownerId: user.id, kind: { not: 'ASSIGNMENT_WORK' } };
     if (user.role === 'ADMIN') {
       // Администратор видит все доски (только просмотр).
@@ -128,6 +128,11 @@ export class BoardsService {
       }),
     ]);
     return { items: boards.map((b) => this.toSummary(b, user)), total, page: q.page, pageSize: q.pageSize };
+  }
+
+  /** Доска, которую пользователь видит (иначе 404). */
+  async requireView(user: BoardUser, boardId: string) {
+    return (await this.requireAccess(user, boardId)).board;
   }
 
   private async requireAccess(user: BoardUser, boardId: string) {
@@ -162,9 +167,9 @@ export class BoardsService {
       ...this.toSummary(b, user),
       role: access.caps.role,
       settings: parseBoardSettings(b.settings),
-      sharedWithTeachers: b.sharedWithTeachers,
       capabilities: access.caps,
-      access: access.caps.manageLesson ? await this.getAccess(boardId) : null,
+      access: access.caps.manageLesson && (b.kind === 'LESSON' || b.kind === 'TEMPLATE') ? await this.getAccess(boardId) : null,
+      work: b.kind === 'ASSIGNMENT_WORK' ? await loadWorkInfo(this.prisma, boardId) : null,
     };
   }
 

@@ -13,6 +13,7 @@ import { Errors, parseInput } from '../common/errors.js';
 import { actorOf } from '../common/actor.js';
 import { BoardsService } from './boards.service.js';
 import { FoldersService } from './folders.service.js';
+import { currentBoardState } from '../realtime/state.js';
 
 const idParams = z.object({ id: z.string().uuid('Неверный идентификатор') });
 
@@ -22,6 +23,7 @@ const idParams = z.object({ id: z.string().uuid('Неверный идентиф
  *   POST   /api/boards                 создать (учитель — урок, ученик — конспект)
  *   GET    /api/boards/:id             свойства, мои права, доступ (для учителя)
  *   GET    /api/boards/:id/people      люди доски (подписи авторов)
+ *   GET    /api/boards/:id/snapshot    документ доски (Yjs) для миниатюр
  *   PATCH  /api/boards/:id             название, описание, папка, настройки
  *   PUT    /api/boards/:id/access      классы и участники (полная замена)
  *   DELETE /api/boards/:id             удалить (владелец)
@@ -58,6 +60,14 @@ export async function boardsRoutes(app: FastifyInstance): Promise<void> {
   app.get('/boards/:id', { config: limit(600) }, async (req) => ({
     board: await boards.get(user(req), parseInput(idParams, req.params).id),
   }));
+
+  // Документ доски целиком (Yjs) — для миниатюр в списках, рисуются в браузере.
+  app.get('/boards/:id/snapshot', { config: limit(1200) }, async (req, reply) => {
+    const boardId = parseInput(idParams, req.params).id;
+    const board = await boards.requireView(user(req), boardId);
+    const state = await currentBoardState(app, boardId, board.ownerId);
+    return reply.type('application/octet-stream').send(Buffer.from(state));
+  });
 
   app.get('/boards/:id/people', { config: limit(300) }, async (req) => ({
     people: await boards.people(user(req), parseInput(idParams, req.params).id),

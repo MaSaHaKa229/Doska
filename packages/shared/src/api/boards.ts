@@ -3,6 +3,7 @@ import { BOARD_KINDS, BOARD_MODES, type BoardKind, type BoardMode, type BoardMem
 import { boardSettingsSchema, type BoardSettings } from '../board/settings.js';
 import { paginationQuerySchema } from './admin.js';
 import type { BoardCapabilities } from '../permissions/capabilities.js';
+import type { BoardWorkInfo } from './assignments.js';
 
 /**
  * Схемы API досок и папок (/api/boards, /api/folders).
@@ -119,8 +120,6 @@ export interface BoardSummary {
   mode: BoardMode;
   owner: { id: string; fullName: string };
   folderId: string | null;
-  /** URL миниатюры (presigned) или null. */
-  thumbnailUrl: string | null;
   objectCount: number;
   pageCount: number;
   lastActivityAt: string;
@@ -130,6 +129,8 @@ export interface BoardSummary {
   /** Кому выдана доска (для списка учителя). */
   classes: { id: string; name: string }[];
   studentCount: number;
+  /** Конспект открыт учителям класса (для остальных досок — false). */
+  sharedWithTeachers: boolean;
 }
 
 export interface BoardAccessView {
@@ -139,7 +140,8 @@ export interface BoardAccessView {
 
 export interface BoardDetails extends BoardSummary {
   settings: BoardSettings;
-  sharedWithTeachers: boolean;
   capabilities: BoardCapabilities;
   access: BoardAccessView | null;
+  /** Для работы по заданию — задание, ученик и статус. */
+  work: BoardWorkInfo | null;
 }

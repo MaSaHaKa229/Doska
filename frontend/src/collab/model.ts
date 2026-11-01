@@ -56,6 +56,11 @@ export interface ModelOptions {
   getCaps: () => BoardCapabilities;
   /** Владелец доски: его объекты — «учительские» для предварительной проверки прав. */
   ownerId: string;
+  /**
+   * Слой новых объектов, если он не задан явно. Учитель в работе ученика
+   * пишет в слой review (пометки проверки), остальные — в content.
+   */
+  defaultLayer?: () => ObjectLayer;
 }
 
 type Listener = () => void;
@@ -507,7 +512,7 @@ export class BoardModel {
     type: string,
     init: { pageId: string; x: number; y: number; props: P; deps?: string[]; layer?: ObjectLayer; groupId?: string | null; z?: string },
   ): string | null {
-    const layer = init.layer ?? 'content';
+    const layer = init.layer ?? this.opts.defaultLayer?.() ?? 'content';
     if (!this.canCreateOn(init.pageId, layer)) return null;
     if (this.entries.size >= LIMITS.maxObjectsPerBoard) return null;
     const module = this.moduleFor(type);

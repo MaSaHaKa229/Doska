@@ -143,7 +143,7 @@ export class Lesson {
 
   private broadcast(make: () => Parameters<Connection['sendControl']>[0]): void {
     const msg = make();
-    for (const c of this.room.conns) if (c.ready) c.sendControl(msg);
+    for (const c of this.room.conns) if (c.ready && !c.lite) c.sendControl(msg);
   }
 
   // ------------------------------------------------------------------
@@ -398,11 +398,11 @@ export class Lesson {
     if (this.followLeader === conn) {
       // Ведущий открыл доску в другой вкладке того же устройства — показ
       // продолжается от неё; иначе прекращается.
-      const other = [...this.room.conns].find((c) => c.user.id === conn.user.id && c.caps.leadFollow && c.ready);
+      const other = [...this.room.conns].find((c) => c.user.id === conn.user.id && c.caps.leadFollow && c.ready && !c.lite);
       if (other) this.followLeader = other;
       else this.endFollow();
     }
-    if (![...this.room.conns].some((c) => c.user.id === conn.user.id)) this.removeHand(conn.user.id);
+    if (![...this.room.conns].some((c) => c.user.id === conn.user.id && !c.lite)) this.removeHand(conn.user.id);
   }
 
   destroy(): void {

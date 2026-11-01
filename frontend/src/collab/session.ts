@@ -49,7 +49,12 @@ export function openBoardSession(details: BoardDetails, user: Me): BoardSession 
     registry,
     getCaps: () => useBoard.getState().caps ?? details.capabilities,
     ownerId: details.owner.id,
+    defaultLayer: () => (details.kind === 'ASSIGNMENT_WORK' && useBoard.getState().caps?.moderate ? 'review' : 'content'),
   });
+  // Работа по заданию: сведения о задании; учитель проверяет красным цветом
+  // (только на этой доске, в настройки инструментов не сохраняется).
+  store.setWork(details.work);
+  if (details.kind === 'ASSIGNMENT_WORK' && details.capabilities.moderate) store.setToolOptions({ stroke: 'accent-1' }, false);
   // Документ хранится в браузере (IndexedDB): изменения, сделанные без
   // связи, переживают перезагрузку вкладки и уйдут на сервер при
   // подключении. База своя для каждой пары «доска + пользователь» и
@@ -134,6 +139,22 @@ export function openBoardSession(details: BoardDetails, user: Me): BoardSession 
         case 'settings.changed':
           if (s.board) s.setBoard({ ...s.board, settings: msg.settings }, s.caps ?? details.capabilities);
           break;
+        case 'work.changed': {
+          const prev = s.work;
+          if (!prev) break;
+          s.setWork({ ...prev, status: msg.status, grade: msg.grade, closed: msg.closed, submittedAt: msg.submittedAt, reviewedAt: msg.reviewedAt });
+          const mine = prev.student.id === user.id;
+          if (mine && msg.status === 'REVIEWED' && prev.status !== 'REVIEWED') {
+            toast.success(msg.grade ? `Учитель проверил работу: ${msg.grade}` : 'Учитель проверил работу');
+          } else if (mine && msg.status === 'IN_PROGRESS' && (prev.status === 'REVIEWED' || prev.status === 'SUBMITTED')) {
+            // Свою отмену сдачи панель работы отражает сразу, поэтому сюда попадает только возврат учителем.
+            toast.info('Учитель вернул работу на доработку');
+          } else if (!mine && msg.status === 'SUBMITTED' && prev.status !== 'SUBMITTED') {
+            toast.info(`${prev.student.fullName} сдал(а) работу`);
+          }
+          if (msg.closed !== prev.closed && mine) toast.info(msg.closed ? 'Приём работ закрыт учителем' : 'Приём работ снова открыт');
+          break;
+        }
         case 'mode.changed':
           if (s.board) s.setBoard({ ...s.board, mode: msg.mode }, s.caps ?? details.capabilities);
           if (msg.by !== user.id) toast.info(`Режим доски: «${BOARD_MODE_LABELS[msg.mode]}»`);

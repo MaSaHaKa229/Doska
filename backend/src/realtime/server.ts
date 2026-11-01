@@ -17,6 +17,8 @@ export interface RealtimeOptions {
   recheckIntervalMs: number;
   /** Максимум одновременных подключений одного пользователя. */
   maxConnectionsPerUser: number;
+  /** Максимум облегчённых подписок (?lite=1, сетка работ) одного пользователя. */
+  maxLiteConnectionsPerUser: number;
   persistence: PersistenceOptions;
 }
 
@@ -25,6 +27,7 @@ export const DEFAULT_REALTIME: RealtimeOptions = {
   helloTimeoutMs: 10_000,
   recheckIntervalMs: 60_000,
   maxConnectionsPerUser: 20,
+  maxLiteConnectionsPerUser: 60,
   persistence: DEFAULT_PERSISTENCE,
 };
 
@@ -157,12 +160,12 @@ export function registerRealtime(app: FastifyInstance, partial: Partial<Realtime
       return reject(socket, 403, 'Forbidden');
     }
     wss.handleUpgrade(req, socket, head, (ws) => {
-      void onConnection(ws, req, m[1]!.toLowerCase());
+      void onConnection(ws, req, m[1]!.toLowerCase(), url.searchParams.get('lite') === '1');
     });
   };
   app.server.on('upgrade', onUpgrade);
 
-  async function onConnection(ws: WebSocket, req: IncomingMessage, boardId: string): Promise<void> {
+  async function onConnection(ws: WebSocket, req: IncomingMessage, boardId: string, lite: boolean): Promise<void> {
     // Сообщения, пришедшие до завершения проверки прав, копятся в очереди.
     const queue: Uint8Array[] = [];
     let handler: ((data: Uint8Array) => void) | null = null;
@@ -197,7 +200,8 @@ export function registerRealtime(app: FastifyInstance, partial: Partial<Realtime
       if (!access.caps.view) return closeWith(CloseCode.Forbidden, 'Нет доступа к доске');
 
       const rooms = await manager.loadedRooms();
-      if (manager.connectionsOfUser(status.id, rooms).length >= opts.maxConnectionsPerUser) {
+      const same = manager.connectionsOfUser(status.id, rooms).filter((c) => c.lite === lite).length;
+      if (same >= (lite ? opts.maxLiteConnectionsPerUser : opts.maxConnectionsPerUser)) {
         return closeWith(CloseCode.RateLimited, 'Слишком много открытых досок');
       }
       if (ws.readyState !== ws.OPEN) return;
@@ -213,6 +217,7 @@ export function registerRealtime(app: FastifyInstance, partial: Partial<Realtime
         access.facts,
         typeof ua === 'string' ? ua : null,
       );
+      conn.lite = lite;
       room.attach(conn);
       ws.on('close', () => {
         room.detach(conn);
@@ -252,6 +257,16 @@ export function registerRealtime(app: FastifyInstance, partial: Partial<Realtime
   app.events.on('board.accessChanged', ({ boardId }) => void refresh(boardId));
   app.events.on('board.updated', ({ boardId, by }) => void refresh(boardId, by));
   app.events.on('board.deleted', ({ boardId }) => void refresh(boardId));
+  app.events.on('assignment.worksChanged', ({ boardIds }) => {
+    for (const boardId of boardIds) {
+      void manager.peek(boardId).then(async (room) => {
+        if (!room) return;
+        // О смене статуса работы клиент сообщает сам — общее «права изменились» не нужно.
+        await room.refreshAccess(undefined, true).catch((err) => app.log.error({ err, boardId }, 'Ошибка пересчёта прав'));
+        await room.broadcastWork().catch((err) => app.log.error({ err, boardId }, 'Ошибка рассылки статуса работы'));
+      });
+    }
+  });
   app.events.on('user.updated', ({ userId }) => {
     void manager.loadedRooms().then(async (rooms) => {
       for (const room of rooms) if ([...room.conns].some((c) => c.user.id === userId)) await room.refreshAccess();

@@ -19,6 +19,7 @@ import { authRoutes } from './auth/auth.routes.js';
 import { healthRoutes } from './health/health.routes.js';
 import { adminRoutes } from './admin/admin.routes.js';
 import { boardsRoutes } from './boards/boards.routes.js';
+import { assignmentsRoutes } from './assignments/assignments.routes.js';
 import { registerRealtime, type RealtimeOptions } from './realtime/server.js';
 
 export interface BuildAppOptions {
@@ -74,6 +75,7 @@ export async function buildApp({ config, prisma, extend, realtime }: BuildAppOpt
   await app.register(authRoutes, { prefix: '/api/auth' });
   await app.register(adminRoutes, { prefix: '/api/admin' });
   await app.register(boardsRoutes, { prefix: '/api' });
+  await app.register(assignmentsRoutes, { prefix: '/api' });
   registerRealtime(app, realtime);
 
   if (extend) await extend(app);

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Eraser, GraduationCap, Hand, KeyRound, MonitorPlay, Pencil, PencilOff, ScreenShare, Undo2 } from 'lucide-react';
+import { ClipboardList, Eraser, GraduationCap, Hand, KeyRound, MonitorPlay, Pencil, PencilOff, ScreenShare, Undo2 } from 'lucide-react';
 import { BOARD_MODE_LABELS, BOARD_MODES, type BoardMode, type BoardSettings } from '@doska/shared';
 import type { BoardSession } from '../../collab/session';
 import { isFollowing, useBoard } from '../../store/board';
@@ -8,6 +8,7 @@ import { Button } from '../../ui/Button';
 import { Checkbox } from '../../ui/Field';
 import { ConfirmDialog } from '../../ui/ConfirmDialog';
 import { AccessDialog } from '../boards/AccessDialog';
+import { CreateAssignmentDialog } from '../assignments/CreateAssignmentDialog';
 import { startFollow } from './useFollow';
 
 /** Всплывающая панель у кнопки шапки: закрывается по клику вне и Esc. */
@@ -57,6 +58,7 @@ export function LessonMenu({ session, sizeRef }: { session: BoardSession; sizeRe
   const [strict, setStrict] = useState(false);
   const [clearOpen, setClearOpen] = useState<null | 'page' | 'all'>(null);
   const [accessOpen, setAccessOpen] = useState(false);
+  const [assignOpen, setAssignOpen] = useState(false);
   if (!board || !caps?.manageLesson) return null;
   const isLesson = board.kind === 'LESSON';
   const leading = follow?.leaderId === userId;
@@ -160,7 +162,7 @@ export function LessonMenu({ session, sizeRef }: { session: BoardSession; sizeRe
           </div>
 
           {(board.kind === 'LESSON' || board.kind === 'TEMPLATE') && (
-            <div className="lesson-menu__section" style={{ paddingBottom: 8 }}>
+            <div className="lesson-menu__section row" style={{ paddingBottom: 8, gap: 4, flexWrap: 'wrap' }}>
               <Button
                 size="small"
                 icon={<KeyRound size={16} />}
@@ -170,6 +172,16 @@ export function LessonMenu({ session, sizeRef }: { session: BoardSession; sizeRe
                 }}
               >
                 Доступ к доске…
+              </Button>
+              <Button
+                size="small"
+                icon={<ClipboardList size={16} />}
+                onClick={() => {
+                  setAssignOpen(true);
+                  setOpen(false);
+                }}
+              >
+                Раздать как задание…
               </Button>
             </div>
           )}
@@ -193,6 +205,7 @@ export function LessonMenu({ session, sizeRef }: { session: BoardSession; sizeRe
         }
       />
       <AccessDialog boardId={board.id} title={board.title} open={accessOpen} onClose={() => setAccessOpen(false)} />
+      <CreateAssignmentDialog open={assignOpen} board={{ id: board.id, title: board.title }} onClose={() => setAssignOpen(false)} />
     </div>
   );
 }

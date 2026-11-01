@@ -43,7 +43,7 @@ export async function loadBoardAccess(
     board.kind === 'ASSIGNMENT_WORK'
       ? prisma.assignmentWork.findUnique({
           where: { boardId },
-          select: { studentId: true, assignment: { select: { closedAt: true } } },
+          select: { studentId: true, status: true, assignment: { select: { closedAt: true } } },
         })
       : null,
     board.kind === 'NOTEBOOK' && user.role === 'TEACHER'
@@ -83,7 +83,9 @@ export async function loadBoardAccess(
     studentViaClass: !!viaClass,
     teachesOwner: !!teachesOwner,
     hasChalk: !!chalk,
-    assignment: work ? { studentId: work.studentId, closed: !!work.assignment.closedAt } : undefined,
+    assignment: work
+      ? { studentId: work.studentId, closed: !!work.assignment.closedAt, submitted: work.status === 'SUBMITTED' || work.status === 'REVIEWED' }
+      : undefined,
     templateVisible,
   };
   return { board, facts, caps: computeCapabilities(facts) };

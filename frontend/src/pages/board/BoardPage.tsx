@@ -20,6 +20,7 @@ import { CursorsLayer, Participants } from './PresenceUi';
 import { ViewMenu } from './ViewMenu';
 import { FollowBanner, HandButton, HandsIndicator, LessonMenu } from './LessonUi';
 import { LaserLayer } from './LaserLayer';
+import { WorkBar } from './WorkBar';
 import { useFollowLead, useFollowView } from './useFollow';
 import { CommandPalette, HelpDialog } from './Palette';
 import { coreCommands } from './boardCommands';
@@ -205,6 +206,7 @@ function BoardWorkspace({ session }: { session: BoardSession }) {
             </Alert>
           </div>
         )}
+        <WorkBar />
         <FollowBanner />
         {hint && (
           <div className="board-hint" role="status">

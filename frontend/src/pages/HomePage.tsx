@@ -1,5 +1,8 @@
 import { Navigate } from 'react-router-dom';
-import { LogOut, Settings2 } from 'lucide-react';
+import { ClipboardList, LogOut, Settings2 } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { AssignmentsList } from './assignments/AssignmentsPage';
+import { StudentAssignments } from './assignments/StudentAssignments';
 import { BoardsSection } from './boards/BoardsSection';
 import { USER_ROLE_LABELS } from '@doska/shared';
 import { useAuth } from '../store/auth';
@@ -13,8 +16,9 @@ import { ConfirmDialog } from '../ui/ConfirmDialog';
 import { useNavigate } from 'react-router-dom';
 
 /**
- * Главная страница учителя и ученика: доски, конспекты, настройки.
- * Администратор попадает в панель. Задания добавляются на этапе 4.2.
+ * Главная страница учителя и ученика. Ученик: задания (свои работы со
+ * статусами и отметками), доски уроков и конспекты. Учитель: последние
+ * задания и доски. Администратор попадает в панель.
  */
 export function HomePage() {
   const { user, updatePreferences, logout } = useAuth();
@@ -37,6 +41,19 @@ export function HomePage() {
         }
         subtitle={USER_ROLE_LABELS[user.role]}
       />
+
+      <section className="card">
+        <div className="card__header">
+          <ClipboardList size={18} />
+          <h2>Задания</h2>
+          {user.role === 'TEACHER' && (
+            <Link to="/assignments" className="small" style={{ marginLeft: 'auto' }}>
+              Все задания
+            </Link>
+          )}
+        </div>
+        <div className="card__body">{user.role === 'STUDENT' ? <StudentAssignments /> : <AssignmentsList limit={5} />}</div>
+      </section>
 
       <BoardsSection user={user} />
 

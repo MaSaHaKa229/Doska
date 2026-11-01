@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link, Outlet, useNavigate } from 'react-router-dom';
-import { KeyRound, LogOut, Monitor, Moon, PenLine, Shield, Sun } from 'lucide-react';
+import { ClipboardList, KeyRound, LogOut, Monitor, Moon, PenLine, Shield, Sun } from 'lucide-react';
 import { USER_ROLE_LABELS } from '@doska/shared';
 import { useAuth } from '../store/auth';
 import { Avatar } from '../ui/misc';
@@ -28,6 +28,11 @@ export function AppLayout() {
         {user.role === 'ADMIN' && (
           <Link to="/admin" className="btn btn--ghost btn--small no-print" title="Администрирование">
             <Shield size={16} /> <span className="topbar__label">Администрирование</span>
+          </Link>
+        )}
+        {user.role === 'TEACHER' && (
+          <Link to="/assignments" className="btn btn--ghost btn--small no-print" title="Задания">
+            <ClipboardList size={16} /> <span className="topbar__label">Задания</span>
           </Link>
         )}
         <div className="spacer" />

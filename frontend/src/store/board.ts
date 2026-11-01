@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { BoardCapabilities, BoardKind, BoardMode, BoardSettings, FollowState, RaisedHand, Rect } from '@doska/shared';
+import type { BoardCapabilities, BoardKind, BoardMode, BoardSettings, BoardWorkInfo, FollowState, RaisedHand, Rect } from '@doska/shared';
 import { DEFAULT_CAMERA, type Camera } from '../canvas/camera';
 import type { ShapeKind } from '../objects/shape';
 import type { SnapResult } from '../canvas/snapping';
@@ -53,6 +53,10 @@ interface BoardState {
   canUndo: boolean;
   canRedo: boolean;
 
+  /** Работа по заданию (доска kind = ASSIGNMENT_WORK) или null. */
+  work: BoardWorkInfo | null;
+  setWork(work: BoardWorkInfo | null): void;
+
   // ----- Урок -----
   chalkHolders: string[];
   hands: RaisedHand[];
@@ -78,7 +82,8 @@ interface BoardState {
   setPanning(v: boolean): void;
   setSelection(ids: string[]): void;
   setMarquee(r: Rect | null): void;
-  setToolOptions(patch: Partial<ToolOptions>): void;
+  /** persist = false — только на этой доске (например, красный цвет пометок проверки). */
+  setToolOptions(patch: Partial<ToolOptions>, persist?: boolean): void;
   setPreview(p: unknown): void;
   setSnapHint(s: SnapResult | null): void;
   setHistory(canUndo: boolean, canRedo: boolean): void;
@@ -116,6 +121,7 @@ const initial = () => ({
   snapHint: null,
   canUndo: false,
   canRedo: false,
+  work: null,
   chalkHolders: [],
   hands: [],
   follow: null,
@@ -174,8 +180,10 @@ export const useBoard = create<BoardState>((set, get) => ({
   setPanning: (panning) => set({ panning }),
   setSelection: (selection) => set({ selection }),
   setMarquee: (marquee) => set({ marquee }),
-  setToolOptions: (patch) => {
+  setWork: (work) => set({ work }),
+  setToolOptions: (patch, persist = true) => {
     const toolOptions = { ...get().toolOptions, ...patch };
+    if (!persist) return set({ toolOptions });
     try {
       localStorage.setItem(TOOL_OPTIONS_KEY, JSON.stringify(toolOptions));
     } catch {

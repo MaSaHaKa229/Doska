@@ -8,6 +8,8 @@ import { AppLayout } from './AppLayout';
 import { AdminLayout } from './AdminLayout';
 import { LoginPage } from '../pages/LoginPage';
 import { ChangePasswordPage } from '../pages/ChangePasswordPage';
+import { AssignmentsPage } from '../pages/assignments/AssignmentsPage';
+import { AssignmentPage } from '../pages/assignments/AssignmentPage';
 import { HomePage } from '../pages/HomePage';
 import { NotFoundPage } from '../pages/NotFoundPage';
 import { DashboardPage } from '../pages/admin/DashboardPage';
@@ -63,6 +65,8 @@ export function App() {
           }
         >
           <Route index element={<HomePage />} />
+          <Route path="assignments" element={<AssignmentsPage />} />
+          <Route path="assignments/:id" element={<AssignmentPage />} />
           <Route
             path="admin"
             element={

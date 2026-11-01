@@ -16,6 +16,8 @@ export interface AppEventMap {
   'board.updated': { boardId: string; /** Кто сменил режим (для mode.changed). */ by?: string };
   /** Доска удалена — закрыть подключения. */
   'board.deleted': { boardId: string };
+  /** Изменился статус работ по заданию (сдача, проверка, закрытие задания). */
+  'assignment.worksChanged': { boardIds: string[] };
 }
 
 export class AppEvents {

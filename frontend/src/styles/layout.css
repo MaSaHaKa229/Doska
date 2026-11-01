@@ -268,7 +268,7 @@
 .board-card__thumb {
   display: grid;
   place-items: center;
-  height: 120px;
+  overflow: hidden;
   color: var(--border-strong);
   background:
     linear-gradient(var(--surface-3) 1px, transparent 1px) 0 0 / 16px 16px,
@@ -758,4 +758,108 @@ kbd {
 }
 .access-filter {
   flex: 1 1 180px;
+}
+
+/* ----- Миниатюры досок (этап 4.2) ----- */
+.thumb-host {
+  width: 100%;
+}
+.thumb-frame {
+  position: relative;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  color: var(--text-3);
+}
+.thumb-frame .thumb {
+  position: absolute;
+  inset: 0;
+  width: 100% !important;
+  height: 100% !important;
+}
+.thumb-frame .thumb > div,
+.thumb-frame .konvajs-content,
+.thumb-frame .thumb canvas {
+  width: 100% !important;
+  height: 100% !important;
+}
+
+/* ----- Задания (этап 4.2) ----- */
+.assignment-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--text);
+  text-decoration: none;
+}
+.assignment-row:hover {
+  border-color: var(--border-strong);
+}
+.assignment-row__title {
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.works-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 12px;
+}
+.work-card {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--surface);
+  color: var(--text);
+  text-decoration: none;
+}
+.work-card:hover {
+  border-color: var(--accent);
+}
+.work-card__thumb {
+  border-bottom: 1px solid var(--border);
+  background: var(--surface-2);
+}
+.work-card__body {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 10px;
+}
+.work-card__name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 500;
+}
+.work-bar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 6px 12px;
+  font-size: 0.86rem;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+}
+.work-bar__title {
+  font-weight: 600;
+}
+.work-bar .input {
+  width: 90px;
+  padding: 4px 8px;
+}
+.assignment-instructions {
+  white-space: pre-wrap;
+  margin: 0 0 12px;
+  color: var(--text-2);
 }

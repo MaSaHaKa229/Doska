@@ -25,6 +25,7 @@ import { BoardPersistence, type PersistenceOptions } from './persistence.js';
 import { Connection } from './connection.js';
 import { Lesson, type LessonCommand } from './lesson.js';
 import { loadBoardAccess, loadModeratorIds } from '../boards/access.js';
+import { loadWorkInfo } from '../boards/work-info.js';
 
 interface BoardMeta {
   title: string;
@@ -65,7 +66,7 @@ export class Room {
       let full: Uint8Array | null = null;
       let hidden: Uint8Array | null = null;
       for (const c of this.conns) {
-        if (!c.ready) continue;
+        if (!c.ready || c.lite) continue;
         if (this.seesStudentCursors(c)) c.send((full ??= this.awarenessFrame(changed, false)));
         else c.send((hidden ??= this.awarenessFrame(changed, true)));
       }
@@ -185,6 +186,7 @@ export class Room {
       return this.handleControl(conn, res.message);
     }
     if (!conn.ready) return conn.close(CloseCode.ProtocolViolation, 'Ожидалось сообщение hello');
+    if (conn.lite && type !== MessageType.Sync) return; // присутствие облегчённой подписке не нужно
     try {
       const decoder = decoding.createDecoder(data);
       decoding.readVarUint(decoder);
@@ -219,6 +221,8 @@ export class Room {
     if (syncType !== syncProtocol.messageYjsSyncStep2 && syncType !== syncProtocol.messageYjsUpdate) {
       throw new GuardError('Неизвестный тип sync-сообщения');
     }
+    // Облегчённая подписка только читает документ.
+    if (conn.lite) return;
     // Обновления нельзя пропускать (это создало бы «дыру» в clock клиента),
     // поэтому при превышении частоты — предупреждение, при повторе — разрыв.
     if (!conn.buckets.sync.take() || !conn.buckets.syncBytes.take(size)) {
@@ -242,6 +246,7 @@ export class Room {
     const all = captured.length === 1 ? captured[0]!.update : Y.mergeUpdates(captured.map((c) => c.update));
     this.broadcast(syncUpdateFrame(all), conn);
     this.persistence.enqueue(all);
+    if (violations.length === 0) this.markWorkStarted(conn);
 
     const compensation = captured.filter((c) => c.origin === SERVER_ORIGIN);
     if (compensation.length) {
@@ -348,15 +353,50 @@ export class Room {
       encoding.writeVarUint(encoder, MessageType.Sync);
       syncProtocol.writeSyncStep1(encoder, this.doc);
       conn.send(encoding.toUint8Array(encoder));
-      this.sendAwarenessTo(conn);
+      if (!conn.lite) this.sendAwarenessTo(conn);
       return;
     }
     if (!conn.ready) return conn.close(CloseCode.ProtocolViolation, 'Ожидалось сообщение hello');
+    if (conn.lite && msg.t !== 'ping') return;
     if (msg.t === 'ping') {
       conn.sendControl({ t: 'pong', ts: msg.ts, serverTime: Date.now() });
       return;
     }
     this.lesson.handle(conn, msg as LessonCommand);
+  }
+
+  // ------------------------------------------------------------------
+  //  Работа по заданию
+  // ------------------------------------------------------------------
+
+  private workStartChecked = false;
+
+  /** Первое принятое изменение ученика в работе: «Не начата» → «В работе». */
+  private markWorkStarted(conn: Connection): void {
+    if (this.workStartChecked || this.meta.kind !== 'ASSIGNMENT_WORK' || conn.caps.role !== 'student') return;
+    this.workStartChecked = true;
+    void this.app.prisma.assignmentWork
+      .updateMany({ where: { boardId: this.boardId, status: 'NOT_STARTED' }, data: { status: 'IN_PROGRESS' } })
+      .then((r) => (r.count ? this.broadcastWork() : undefined))
+      .catch((err) => this.app.log.error({ err, boardId: this.boardId }, 'Не удалось отметить начало работы'));
+  }
+
+  /** Разослать участникам текущий статус работы по заданию. */
+  async broadcastWork(): Promise<void> {
+    if (this.meta.kind !== 'ASSIGNMENT_WORK') return;
+    const info = await loadWorkInfo(this.app.prisma, this.boardId);
+    if (!info) return;
+    for (const c of this.conns) {
+      if (!c.ready || c.lite) continue;
+      c.sendControl({
+        t: 'work.changed',
+        status: info.status,
+        grade: info.grade,
+        closed: info.closed,
+        submittedAt: info.submittedAt,
+        reviewedAt: info.reviewedAt,
+      });
+    }
   }
 
   // ------------------------------------------------------------------
@@ -367,7 +407,7 @@ export class Room {
    * Пересчёт прав всех подключённых (после смены доступа, режима, настроек,
    * роли пользователя). Потерявшие доступ отключаются.
    */
-  async refreshAccess(modeBy?: string): Promise<void> {
+  async refreshAccess(modeBy?: string, quiet = false): Promise<void> {
     const board = await this.app.prisma.board.findFirst({ where: { id: this.boardId, deletedAt: null } });
     if (!board) {
       for (const c of this.conns) c.close(CloseCode.NotFound, 'Доска удалена');
@@ -409,7 +449,7 @@ export class Room {
       if (changed) {
         conn.sendControl({ t: 'capabilities', capabilities: access.caps });
         // О смене режима и мела клиент сообщает сам, понятнее общего «права изменились».
-        if (!modeChanged && !chalkChanged) conn.sendControl({ t: 'notice', level: 'info', code: 'RIGHTS_CHANGED', message: 'Ваши права на доске изменились' });
+        if (!modeChanged && !chalkChanged && !quiet) conn.sendControl({ t: 'notice', level: 'info', code: 'RIGHTS_CHANGED', message: 'Ваши права на доске изменились' });
       }
     }
   }

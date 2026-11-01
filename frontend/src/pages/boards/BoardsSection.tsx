@@ -12,6 +12,9 @@ import {
   Trash2,
   Users,
   KeyRound,
+  ClipboardList,
+  Eye,
+  EyeOff,
 } from 'lucide-react';
 import { BOARD_MODE_LABELS, type BoardSummary, type FolderView, type Me } from '@doska/shared';
 import { boardsApi } from '../../api/boards';
@@ -26,6 +29,8 @@ import { Alert, Badge, EmptyState, Pagination, Spinner } from '../../ui/misc';
 import { CreateBoardDialog, FolderDialog, MoveBoardDialog, RenameBoardDialog } from './BoardDialogs';
 import { descendantsOf, flattenFolders } from './folderTree';
 import { AccessDialog } from './AccessDialog';
+import { CreateAssignmentDialog } from '../assignments/CreateAssignmentDialog';
+import { BoardSnapshotThumb } from '../../ui/Thumbs';
 
 const PAGE_SIZE = 24;
 
@@ -67,6 +72,17 @@ export function BoardsSection({ user }: { user: Me }) {
   const [moving, setMoving] = useState<BoardSummary | null>(null);
   const [deleting, setDeleting] = useState<BoardSummary | null>(null);
   const [accessFor, setAccessFor] = useState<BoardSummary | null>(null);
+  const [assignFrom, setAssignFrom] = useState<BoardSummary | null>(null);
+  /** Конспект ученика: открыть или скрыть от учителей его классов. */
+  const toggleShared = async (b: BoardSummary) => {
+    try {
+      await boardsApi.update(b.id, { sharedWithTeachers: !b.sharedWithTeachers });
+      toast.success(b.sharedWithTeachers ? 'Конспект скрыт от учителей' : 'Учителя ваших классов теперь видят этот конспект');
+      list.reload();
+    } catch (err) {
+      toast.error(errorMessage(err));
+    }
+  };
   const [folderDialog, setFolderDialog] = useState<{ folder: FolderView | null; parentId: string | null } | null>(null);
   const [deletingFolder, setDeletingFolder] = useState<FolderView | null>(null);
   const [busy, setBusy] = useState(false);
@@ -182,7 +198,7 @@ export function BoardsSection({ user }: { user: Me }) {
             {list.data?.items.map((b) => (
               <article key={b.id} className="board-card">
                 <Link to={`/boards/${b.id}`} className="board-card__thumb" aria-hidden tabIndex={-1}>
-                  <LayoutGrid size={28} />
+                  <BoardSnapshotThumb boardId={b.id} version={b.lastActivityAt} width={320} height={140} placeholder={<LayoutGrid size={28} />} />
                 </Link>
                 <div className="board-card__body">
                   <h3 className="board-card__title" title={b.title}>
@@ -190,7 +206,7 @@ export function BoardsSection({ user }: { user: Me }) {
                   </h3>
                   <div className="row" style={{ gap: 4 }}>
                     {b.kind === 'LESSON' && <Badge kind="accent">{BOARD_MODE_LABELS[b.mode]}</Badge>}
-                    {b.kind === 'NOTEBOOK' && <Badge>Конспект</Badge>}
+                    {b.kind === 'NOTEBOOK' && <Badge>{b.sharedWithTeachers ? 'Конспект · виден учителям' : 'Конспект'}</Badge>}
                     {b.classes.map((c) => (
                       <Badge key={c.id}>{c.name}</Badge>
                     ))}
@@ -218,6 +234,18 @@ export function BoardsSection({ user }: { user: Me }) {
                           icon: <KeyRound size={16} />,
                           hidden: b.kind !== 'LESSON' && b.kind !== 'TEMPLATE',
                           onSelect: () => setAccessFor(b),
+                        },
+                        {
+                          label: 'Раздать как задание…',
+                          icon: <ClipboardList size={16} />,
+                          hidden: !isTeacher || (b.kind !== 'LESSON' && b.kind !== 'TEMPLATE'),
+                          onSelect: () => setAssignFrom(b),
+                        },
+                        {
+                          label: b.sharedWithTeachers ? 'Скрыть от учителей' : 'Открыть учителям',
+                          icon: b.sharedWithTeachers ? <EyeOff size={16} /> : <Eye size={16} />,
+                          hidden: b.kind !== 'NOTEBOOK' || b.role !== 'owner',
+                          onSelect: () => void toggleShared(b),
                         },
                         { label: 'Переименовать', icon: <Pencil size={16} />, hidden: b.role !== 'owner', onSelect: () => setRenaming(b) },
                         { label: 'Переместить в папку', icon: <FolderInput size={16} />, hidden: b.role !== 'owner', onSelect: () => setMoving(b) },
@@ -247,6 +275,7 @@ export function BoardsSection({ user }: { user: Me }) {
           reloadAll();
         }}
       />
+      <CreateAssignmentDialog open={!!assignFrom} board={assignFrom} onClose={() => setAssignFrom(null)} />
       {accessFor && (
         <AccessDialog boardId={accessFor.id} title={accessFor.title} open onClose={() => setAccessFor(null)} onSaved={() => list.reload()} />
       )}

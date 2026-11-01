@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { BOARD_KINDS, BOARD_MODES, USER_ROLES } from '../enums.js';
+import { ASSIGNMENT_WORK_STATUSES, BOARD_KINDS, BOARD_MODES, USER_ROLES } from '../enums.js';
 import { boardSettingsSchema } from '../board/settings.js';
 import { ENTITY_ID_RE } from '../board/object.js';
 
@@ -126,7 +126,7 @@ export const capabilitiesSchema = z.object({
   role: z.enum(['owner', 'teacher', 'student', 'viewer', 'none']),
   view: z.boolean(),
   write: z.boolean(),
-  noWriteReason: z.enum(['lecture-mode', 'no-chalk', 'read-only', 'assignment-closed', 'no-access']).nullable(),
+  noWriteReason: z.enum(['lecture-mode', 'no-chalk', 'read-only', 'assignment-closed', 'assignment-submitted', 'no-access']).nullable(),
   moderate: z.boolean(),
   manageLesson: z.boolean(),
   managePages: z.boolean(),
@@ -230,6 +230,15 @@ export const serverControlSchema = z.discriminatedUnion('t', [
   z.object({ t: z.literal('follow.state'), state: followStateSchema.nullable() }),
   z.object({ t: z.literal('hands'), hands: z.array(raisedHandSchema) }),
   z.object({ t: z.literal('settings.changed'), settings: boardSettingsSchema }),
+  /** Работа по заданию: статус, отметка, закрытие задания (доска kind = ASSIGNMENT_WORK). */
+  z.object({
+    t: z.literal('work.changed'),
+    status: z.enum(ASSIGNMENT_WORK_STATUSES),
+    grade: z.string().nullable(),
+    closed: z.boolean(),
+    submittedAt: z.string().nullable(),
+    reviewedAt: z.string().nullable(),
+  }),
   z.object({
     t: z.literal('notice'),
     level: z.enum(['info', 'warning', 'error']),

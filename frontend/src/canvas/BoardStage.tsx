@@ -63,7 +63,7 @@ interface ObjectViewProps {
  * поэтому узлы Konva не слушают события (listening = false) — это заметно
  * ускоряет отрисовку при тысячах объектов.
  */
-const ObjectView = memo(function ObjectView({ model, id, theme, register }: ObjectViewProps) {
+export const ObjectView = memo(function ObjectView({ model, id, theme, register }: ObjectViewProps) {
   const entry = useSyncExternalStore(
     useCallback((cb) => model.subscribeObject(id, cb), [model, id]),
     () => model.get(id),

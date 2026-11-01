@@ -257,6 +257,11 @@ export class BoardProvider {
 }
 
 function defaultUrl(boardId: string): string {
+  return boardSocketUrl(boardId);
+}
+
+/** Адрес WebSocket доски; lite — облегчённая подписка (только документ, для миниатюр). */
+export function boardSocketUrl(boardId: string, lite = false): string {
   const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
-  return `${proto}//${location.host}/ws/boards/${boardId}`;
+  return `${proto}//${location.host}/ws/boards/${boardId}${lite ? '?lite=1' : ''}`;
 }
