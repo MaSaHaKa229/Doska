@@ -6,6 +6,7 @@ import {
   listBoardsQuerySchema,
   setBoardAccessSchema,
   updateBoardSchema,
+  directoryQuerySchema,
   updateFolderSchema,
 } from '@doska/shared';
 import { Errors, parseInput } from '../common/errors.js';
@@ -25,6 +26,7 @@ const idParams = z.object({ id: z.string().uuid('Неверный идентиф
  *   PUT    /api/boards/:id/access      классы и участники (полная замена)
  *   DELETE /api/boards/:id             удалить (владелец)
  *   GET    /api/boards/my-classes      классы учителя для выдачи досок
+ *   GET    /api/directory/users        поиск учеников и учителей для выдачи доступа (учитель)
  *   GET/POST /api/folders, PATCH/DELETE /api/folders/:id
  */
 export async function boardsRoutes(app: FastifyInstance): Promise<void> {
@@ -42,6 +44,10 @@ export async function boardsRoutes(app: FastifyInstance): Promise<void> {
 
   app.get('/boards', { config: limit(600) }, async (req) => boards.list(user(req), parseInput(listBoardsQuerySchema, req.query)));
 
+  app.get('/directory/users', { config: limit(600) }, async (req) => ({
+    users: await boards.directory(user(req), parseInput(directoryQuerySchema, req.query)),
+  }));
+
   app.get('/boards/my-classes', { config: limit(300) }, async (req) => ({ classes: await boards.myClasses(user(req)) }));
 
   app.post('/boards', { config: limit(120) }, async (req, reply) => {
@@ -58,7 +64,7 @@ export async function boardsRoutes(app: FastifyInstance): Promise<void> {
   }));
 
   app.patch('/boards/:id', { config: limit(240) }, async (req) => ({
-    board: await boards.update(user(req), parseInput(idParams, req.params).id, parseInput(updateBoardSchema, req.body)),
+    board: await boards.update(user(req), parseInput(idParams, req.params).id, parseInput(updateBoardSchema, req.body), actorOf(req)),
   }));
 
   app.put('/boards/:id/access', { config: limit(120) }, async (req) => ({

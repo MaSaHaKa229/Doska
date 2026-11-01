@@ -2,7 +2,7 @@ import type { ReactNode } from 'react';
 import { PluginRegistry, type BoardPlugin } from '@doska/shared';
 import { shapeModule } from '../objects/shape';
 import { groupModule } from '../objects/group';
-import { handTool, selectTool, shapeTool } from '../tools/shape-tools';
+import { handTool, laserTool, selectTool, shapeTool } from '../tools/shape-tools';
 
 /**
  * Базовый плагин ядра: выделение, рука, группа и фигуры.
@@ -13,7 +13,7 @@ export const corePlugin: BoardPlugin<ReactNode> = {
   id: 'core',
   title: 'Основные',
   objects: [shapeModule, groupModule],
-  tools: [selectTool, handTool, ...(['rect', 'ellipse', 'triangle', 'line', 'arrow'] as const).map(shapeTool)],
+  tools: [selectTool, handTool, laserTool, ...(['rect', 'ellipse', 'triangle', 'line', 'arrow'] as const).map(shapeTool)],
 };
 
 /**

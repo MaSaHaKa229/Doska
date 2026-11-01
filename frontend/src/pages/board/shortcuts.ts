@@ -1,10 +1,10 @@
 import { useEffect } from 'react';
+import { toolUnavailable } from '../../tools/availability';
 import { registry } from '../../plugins/registry';
 import { useBoard } from '../../store/board';
 import { HAND_TOOL_ID, SELECT_TOOL_ID } from '../../tools/shape-tools';
 import type { BoardCommands } from './commands';
 import { decodeClipboard, encodeClipboard } from './clipboard';
-import { noWriteHint } from '@doska/shared';
 import { toast } from '../../store/toast';
 
 function isTyping(target: EventTarget | null): boolean {
@@ -79,8 +79,9 @@ export function useBoardShortcuts(commands: BoardCommands | null, ui: { palette:
       if (t) {
         e.preventDefault();
         const caps = store().caps;
-        if (t.requiresWrite && !caps?.write) {
-          toast.info(noWriteHint(caps?.noWriteReason ?? 'read-only') ?? 'Нет права записи');
+        const reason = toolUnavailable(t, caps);
+        if (reason) {
+          toast.info(reason);
           return;
         }
         store().setTool(t.id);

@@ -6,6 +6,7 @@ import {
   MoveUpRight,
   Square,
   Triangle,
+  Zap,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -22,6 +23,7 @@ const ICONS: Record<string, LucideIcon> = {
   MoveUpRight,
   Square,
   Triangle,
+  Zap,
 };
 
 export function registerIcons(icons: Record<string, LucideIcon>): void {

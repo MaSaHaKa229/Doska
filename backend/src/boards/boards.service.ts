@@ -6,6 +6,8 @@ import {
   type BoardDetails,
   type BoardSummary,
   type CreateBoardRequest,
+  type DirectoryQuery,
+  type DirectoryUser,
   type ListBoardsQuery,
   type Paginated,
   type SetBoardAccessRequest,
@@ -258,7 +260,7 @@ export class BoardsService {
     return this.get(user, board.id);
   }
 
-  async update(user: BoardUser, boardId: string, input: UpdateBoardRequest): Promise<BoardDetails> {
+  async update(user: BoardUser, boardId: string, input: UpdateBoardRequest, actor: Actor): Promise<BoardDetails> {
     const access = await this.requireAccess(user, boardId);
     const { caps, board } = access;
     const isOwner = board.ownerId === user.id;
@@ -270,22 +272,42 @@ export class BoardsService {
       await this.assertFolder(user, input.folderId);
     }
     if (input.settings && !caps.manageLesson) throw Errors.forbidden('Настройки доски меняет учитель');
+    if (input.mode !== undefined) {
+      if (!caps.manageLesson) throw Errors.forbidden('Режим доски меняет учитель');
+      if (board.kind !== 'LESSON') throw Errors.conflict('Режим есть только у доски урока');
+    }
+    const modeChanged = input.mode !== undefined && input.mode !== board.mode;
     if (input.sharedWithTeachers !== undefined && !(board.kind === 'NOTEBOOK' && isOwner)) {
       throw Errors.forbidden('Открыть учителям можно только свой конспект');
     }
     const settings = input.settings ? { ...parseBoardSettings(board.settings), ...input.settings } : undefined;
-    await this.prisma.board.update({
-      where: { id: boardId },
-      data: {
-        ...(input.title !== undefined ? { title: input.title } : {}),
-        ...(input.description !== undefined ? { description: input.description || null } : {}),
-        ...(input.folderId !== undefined ? { folderId: input.folderId } : {}),
-        ...(settings ? { settings: settings as Prisma.InputJsonValue } : {}),
-        ...(input.sharedWithTeachers !== undefined ? { sharedWithTeachers: input.sharedWithTeachers } : {}),
-      },
+    await this.prisma.$transaction(async (tx) => {
+      await tx.board.update({
+        where: { id: boardId },
+        data: {
+          ...(input.mode !== undefined ? { mode: input.mode } : {}),
+          ...(input.title !== undefined ? { title: input.title } : {}),
+          ...(input.description !== undefined ? { description: input.description || null } : {}),
+          ...(input.folderId !== undefined ? { folderId: input.folderId } : {}),
+          ...(settings ? { settings: settings as Prisma.InputJsonValue } : {}),
+          ...(input.sharedWithTeachers !== undefined ? { sharedWithTeachers: input.sharedWithTeachers } : {}),
+        },
+      });
+      if (modeChanged) {
+        await this.audit.record(
+          {
+            action: 'BOARD_MODE_CHANGED',
+            ...auditBase(actor),
+            targetType: 'board',
+            targetId: boardId,
+            details: { title: board.title, from: board.mode, to: input.mode },
+          },
+          tx,
+        );
+      }
     });
-    if (settings || input.title !== undefined || input.sharedWithTeachers !== undefined) {
-      this.events.emit('board.updated', { boardId });
+    if (settings || modeChanged || input.title !== undefined || input.sharedWithTeachers !== undefined) {
+      this.events.emit('board.updated', { boardId, ...(modeChanged ? { by: user.id } : {}) });
     }
     return this.get(user, boardId);
   }
@@ -376,6 +398,40 @@ export class BoardsService {
       take: 2000,
     });
     return users;
+  }
+
+  /**
+   * Поиск людей для выдачи доступа к доске. Только для учителей: ученики —
+   * все действующие (доску можно выдать любому ученику), учителя — для
+   * соведущих. Ищется по ФИО и логину.
+   */
+  async directory(user: BoardUser, q: DirectoryQuery): Promise<DirectoryUser[]> {
+    if (user.role !== 'TEACHER') throw Errors.forbidden('Поиск людей доступен учителям');
+    if (q.classId) await this.assertTeacherClasses(user, [q.classId]);
+    const and: Prisma.UserWhereInput[] = [{ role: q.role, deletedAt: null, isBlocked: false, id: { not: user.id } }];
+    if (q.search) {
+      and.push({ OR: [{ fullName: { contains: q.search, mode: 'insensitive' } }, { login: { contains: q.search.toLowerCase() } }] });
+    }
+    if (q.classId) and.push({ classMemberships: { some: { classId: q.classId, role: 'STUDENT' } } });
+    const users = await this.prisma.user.findMany({
+      where: { AND: and },
+      select: {
+        id: true,
+        fullName: true,
+        login: true,
+        role: true,
+        classMemberships: { where: { class: { archivedAt: null } }, select: { class: { select: { name: true } } } },
+      },
+      orderBy: [{ fullName: 'asc' }, { id: 'asc' }],
+      take: q.limit,
+    });
+    return users.map((u) => ({
+      id: u.id,
+      fullName: u.fullName,
+      login: u.login,
+      role: u.role as DirectoryUser['role'],
+      classes: u.classMemberships.map((m) => m.class.name).sort((a, b) => a.localeCompare(b, 'ru')),
+    }));
   }
 
   /** Классы, где пользователь — учитель (для выдачи досок). */

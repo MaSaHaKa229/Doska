@@ -103,14 +103,18 @@ describe('подключение и синхронизация', () => {
     s.close();
   });
 
-  it('ping → pong; команды управления уроком пока отклоняются явно', async () => {
+  it('ping → pong; команду урока без права сервер отклоняет', async () => {
     const t = await join(w.teacher, w.boardId);
+    const s = await join(w.student, w.boardId);
     t.sendControl({ t: 'ping', ts: 123 });
     await waitFor(() => t.control('pong').length === 1);
     expect(t.control('pong')[0]!.ts).toBe(123);
-    t.sendControl({ t: 'mode.set', mode: 'LECTURE' });
-    await waitFor(() => t.control('error').length === 1);
+    s.sendControl({ t: 'mode.set', mode: 'LECTURE' });
+    await waitFor(() => s.control('error').length === 1);
+    expect(s.control('error')[0]!.code).toBe('FORBIDDEN');
+    expect((await testPrisma().board.findUniqueOrThrow({ where: { id: w.boardId } })).mode).toBe('COLLABORATIVE');
     t.close();
+    s.close();
   });
 });
 
@@ -285,5 +289,200 @@ describe('сохранение', () => {
     await waitFor(() => again.objects().size === 5, 3000, 'восстановление после перезагрузки');
     expect(again.objects().get('persisted2x')!.get('x')).toBe(777);
     again.close();
+  });
+});
+
+describe('управление уроком', () => {
+  const caps = (y: YClient) => {
+    const list = y.control('capabilities');
+    return list.length ? list[list.length - 1]!.capabilities : y.control('session.init')[0]!.capabilities;
+  };
+
+  it('режим одной командой: БД, журнал, рассылка и пересчёт прав', async () => {
+    const t = await join(w.teacher, w.boardId);
+    const s = await join(w.student, w.boardId);
+    t.sendControl({ t: 'mode.set', mode: 'LECTURE' });
+    await waitFor(() => s.control('mode.changed').length === 1, 3000, 'mode.changed');
+    expect(s.control('mode.changed')[0]).toMatchObject({ mode: 'LECTURE', by: w.teacherId });
+    await waitFor(() => caps(s).write === false, 3000, 'новые права ученика');
+    expect(caps(s).noWriteReason).toBe('lecture-mode');
+    expect((await testPrisma().board.findUniqueOrThrow({ where: { id: w.boardId } })).mode).toBe('LECTURE');
+    const audit = await testPrisma().auditLog.findFirst({ where: { action: 'BOARD_MODE_CHANGED', targetId: w.boardId } });
+    expect(audit?.details).toMatchObject({ from: 'COLLABORATIVE', to: 'LECTURE' });
+    // Учителю права не меняются — capabilities ему не присылаются.
+    expect(t.control('capabilities')).toHaveLength(0);
+
+    // Штрих ученика после смены режима отменяется.
+    addObject(s, w.studentId, 'lateStroke1');
+    await waitFor(() => !s.objects().has('lateStroke1'), 3000, 'компенсация');
+    t.close();
+    s.close();
+  });
+
+  it('смена режима через REST тоже доходит до подключённых', async () => {
+    const s = await join(w.student, w.boardId);
+    const res = await w.teacher.request('PATCH', `/api/boards/${w.boardId}`, { mode: 'SELECTIVE' });
+    expect(res.statusCode).toBe(200);
+    await waitFor(() => s.control('mode.changed').length === 1, 3000, 'mode.changed');
+    expect(s.control('mode.changed')[0]).toMatchObject({ mode: 'SELECTIVE', by: w.teacherId });
+    await waitFor(() => caps(s).noWriteReason === 'no-chalk', 3000, 'права');
+    const denied = await w.student.request('PATCH', `/api/boards/${w.boardId}`, { mode: 'COLLABORATIVE' });
+    expect(denied.statusCode).toBe(403);
+    s.close();
+  });
+
+  it('мел: выдача опускает руку, даёт право записи; забрать у всех', async () => {
+    await setMode(w.boardId, 'SELECTIVE');
+    const t = await join(w.teacher, w.boardId);
+    const s = await join(w.student, w.boardId);
+    expect(caps(s).write).toBe(false);
+
+    s.sendControl({ t: 'hand.raise' });
+    await waitFor(() => t.control('hands').some((m) => m.hands.length === 1), 3000, 'рука у учителя');
+    expect(t.control('hands').at(-1)!.hands[0]).toMatchObject({ userId: w.studentId, fullName: 'Иванов Иван' });
+
+    t.sendControl({ t: 'chalk.set', userId: w.studentId, granted: true });
+    await waitFor(() => caps(s).write === true, 3000, 'мел');
+    await waitFor(() => t.control('hands').at(-1)!.hands.length === 0, 3000, 'рука опущена');
+    expect(s.control('chalk.changed').at(-1)!.holders).toEqual([w.studentId]);
+    expect(await testPrisma().chalkGrant.count({ where: { boardId: w.boardId } })).toBe(1);
+
+    addObject(s, w.studentId, 'chalkStroke1');
+    await waitFor(() => t.objects().has('chalkStroke1'), 3000, 'штрих с мелом');
+
+    // Новое подключение получает владельцев мела в session.init.
+    const s2 = await join(w.student, w.boardId);
+    expect(s2.control('session.init')[0]!.chalkHolders).toEqual([w.studentId]);
+    expect(s2.control('session.init')[0]!.capabilities.write).toBe(true);
+
+    t.sendControl({ t: 'chalk.revokeAll' });
+    await waitFor(() => caps(s).write === false, 3000, 'мел забран');
+    expect(await testPrisma().chalkGrant.count({ where: { boardId: w.boardId } })).toBe(0);
+
+    // Мел можно дать только допущенному ученику.
+    const outsider = await testPrisma().user.findFirstOrThrow({ where: { login: 'outsider' } });
+    t.sendControl({ t: 'chalk.set', userId: outsider.id, granted: true });
+    await waitFor(() => t.control('error').length === 1, 3000, 'ошибка');
+    expect(t.control('error')[0]!.code).toBe('BAD_REQUEST');
+    t.close();
+    s.close();
+    s2.close();
+  });
+
+  it('руки: ученик поднимает и опускает, учитель снимает, при уходе рука опускается', async () => {
+    const t = await join(w.teacher, w.boardId);
+    const s = await join(w.student, w.boardId);
+    s.sendControl({ t: 'hand.raise' });
+    s.sendControl({ t: 'hand.raise' });
+    await waitFor(() => t.control('hands').length >= 1, 3000, 'рука');
+    await sleep(50);
+    expect(t.control('hands')).toHaveLength(1);
+    s.sendControl({ t: 'hand.lower' });
+    await waitFor(() => t.control('hands').at(-1)!.hands.length === 0, 3000, 'опущена');
+
+    s.sendControl({ t: 'hand.raise' });
+    await waitFor(() => t.control('hands').at(-1)!.hands.length === 1, 3000, 'снова');
+    t.sendControl({ t: 'hand.dismiss', userId: w.studentId });
+    await waitFor(() => s.control('notice').some((n) => n.code === 'HAND_DISMISSED'), 3000, 'уведомление ученику');
+
+    // Учитель руку не поднимает.
+    t.sendControl({ t: 'hand.raise' });
+    await waitFor(() => t.control('error').length === 1, 3000, 'отказ');
+
+    s.sendControl({ t: 'hand.raise' });
+    await waitFor(() => t.control('hands').at(-1)!.hands.length === 1, 3000, 'рука перед уходом');
+    s.close();
+    await waitFor(() => t.control('hands').at(-1)!.hands.length === 0, 3000, 'рука ушедшего опущена');
+    t.close();
+  });
+
+  it('«Следуйте за мной»: состояние, ограничение частоты, конец при уходе ведущего', async () => {
+    const t = await join(w.teacher, w.boardId);
+    const s = await join(w.student, w.boardId);
+    const pageId = t.pageId();
+    const vp = (x: number) => ({ pageId, centerX: x, centerY: 0, zoom: 1, w: 1000, h: 600 });
+
+    s.sendControl({ t: 'follow.start', viewport: vp(0), strict: true });
+    await waitFor(() => s.control('error').length === 1, 3000, 'ученик не ведёт');
+
+    t.sendControl({ t: 'follow.start', viewport: vp(0), strict: true });
+    await waitFor(() => s.control('follow.state').length === 1, 3000, 'начало показа');
+    expect(s.control('follow.state')[0]!.state).toMatchObject({ leaderId: w.teacherId, strict: true, viewport: { w: 1000 } });
+
+    for (let i = 1; i <= 12; i++) t.sendControl({ t: 'follow.update', viewport: vp(i), scenes: [] });
+    await waitFor(() => s.control('follow.state').at(-1)!.state?.viewport.centerX === 12, 3000, 'последний вид');
+    // 12 обновлений подряд не уходят все: не чаще 15 в секунду.
+    expect(s.control('follow.state').length).toBeLessThan(6);
+
+    const late = await join(w.student, w.boardId);
+    expect(late.control('session.init')[0]!.follow).toMatchObject({ leaderId: w.teacherId, viewport: { centerX: 12 } });
+
+    t.close();
+    await waitFor(() => s.control('follow.state').at(-1)!.state === null, 3000, 'показ окончен');
+    s.close();
+    late.close();
+  });
+
+  it('очистка записей учеников: снимок BEFORE_CLEAR, учительское остаётся, группы в порядке', async () => {
+    const t = await join(w.teacher, w.boardId);
+    const s = await join(w.student, w.boardId);
+    addObject(t, w.teacherId, 'teacherKeep1');
+    addObject(s, w.studentId, 'studentDel1');
+    addObject(s, w.studentId, 'studentDel2');
+    // Группа ученика с его же объектом — исчезает вместе с ним.
+    addObject(s, w.studentId, 'studentGrp1', { type: 'core.group', props: {} });
+    addObject(s, w.studentId, 'studentDel3', { groupId: 'studentGrp1' });
+    await waitFor(() => t.objects().size === 5, 3000, 'объекты у учителя');
+
+    s.sendControl({ t: 'objects.clearByAuthors', authors: 'students', pageId: null });
+    await waitFor(() => s.control('error').length === 1, 3000, 'ученику нельзя');
+
+    t.sendControl({ t: 'objects.clearByAuthors', authors: [w.studentId], pageId: t.pageId() });
+    await waitFor(() => t.objects().size === 1 && s.objects().size === 1, 3000, 'очистка');
+    expect(t.objects().has('teacherKeep1')).toBe(true);
+    await waitFor(() => s.control('notice').some((n) => n.code === 'BOARD_CLEARED'), 3000, 'уведомление');
+    expect(s.control('notice').find((n) => n.code === 'BOARD_CLEARED')!.message).toContain('Иванов Иван');
+
+    const version = await testPrisma().boardVersion.findFirstOrThrow({ where: { boardId: w.boardId, reason: 'BEFORE_CLEAR' } });
+    const snap = new Y.Doc();
+    Y.applyUpdate(snap, version.state);
+    expect(snap.getMap('objects').size).toBe(5);
+    expect(await testPrisma().auditLog.count({ where: { action: 'BOARD_CLEARED', targetId: w.boardId } })).toBe(1);
+
+    // Повторная очистка — нечего удалять, снимок не создаётся.
+    t.sendControl({ t: 'objects.clearByAuthors', authors: 'students', pageId: null });
+    await waitFor(() => t.control('notice').filter((n) => n.code === 'BOARD_CLEARED').length === 2, 3000, 'нечего');
+    expect(await testPrisma().boardVersion.count({ where: { boardId: w.boardId, reason: 'BEFORE_CLEAR' } })).toBe(1);
+    t.close();
+    s.close();
+  });
+
+  it('настройки: settings.set сохраняет, пересчитывает права; курсоры учеников скрываются от учеников', async () => {
+    const t = await join(w.teacher, w.boardId);
+    const s = await join(w.student, w.boardId);
+    const peerUser = await createUser({ login: 'peer', password: 'kot12345', role: 'STUDENT', fullName: 'Петров Пётр' });
+    const cls = await testPrisma().class.findFirstOrThrow({ where: { name: '9А' } });
+    await testPrisma().classMember.create({ data: { classId: cls.id, userId: peerUser.id, role: 'STUDENT' } });
+    const peerClient = new TestClient(app);
+    await peerClient.login('peer', 'kot12345');
+    const p = await join(peerClient, w.boardId);
+
+    t.sendControl({ t: 'settings.set', settings: { showStudentCursors: false, allowStudentLaser: false } });
+    await waitFor(() => s.control('settings.changed').length === 1, 3000, 'settings.changed');
+    expect(caps(s).laser).toBe(false);
+    const stored = await testPrisma().board.findUniqueOrThrow({ where: { id: w.boardId } });
+    expect(stored.settings).toMatchObject({ showStudentCursors: false, allowStudentLaser: false });
+
+    s.awareness.setLocalState({ cursor: { pageId: s.pageId(), x: 5, y: 6 }, selection: [], tool: null, editing: null, viewport: null, laser: null, drawing: null });
+    const stateOf = (y: YClient) =>
+      [...y.awareness.getStates().values()].find((st) => (st as { user?: { id: string } }).user?.id === w.studentId) as
+        | { cursor: unknown }
+        | undefined;
+    await waitFor(() => !!stateOf(t)?.cursor, 3000, 'учитель видит курсор');
+    await waitFor(() => !!stateOf(p), 3000, 'ученик видит присутствие');
+    expect(stateOf(p)!.cursor).toBeNull();
+    t.close();
+    s.close();
+    p.close();
   });
 });

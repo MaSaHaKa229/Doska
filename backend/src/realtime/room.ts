@@ -23,6 +23,7 @@ import {
 import { DocGuard, GuardError, SERVER_ORIGIN } from './guard.js';
 import { BoardPersistence, type PersistenceOptions } from './persistence.js';
 import { Connection } from './connection.js';
+import { Lesson, type LessonCommand } from './lesson.js';
 import { loadBoardAccess, loadModeratorIds } from '../boards/access.js';
 
 interface BoardMeta {
@@ -41,10 +42,11 @@ export class Room {
   readonly conns = new Set<Connection>();
   readonly awareness: awarenessProtocol.Awareness;
   readonly guard: DocGuard;
+  readonly lesson: Lesson;
   unloadTimer: NodeJS.Timeout | null = null;
 
   private constructor(
-    private readonly app: FastifyInstance,
+    readonly app: FastifyInstance,
     readonly boardId: string,
     readonly doc: Y.Doc,
     readonly persistence: BoardPersistence,
@@ -53,17 +55,56 @@ export class Room {
   ) {
     this.guard = new DocGuard(doc);
     this.guard.moderatorIds = moderatorIds;
+    this.lesson = new Lesson(this);
     this.awareness = new awarenessProtocol.Awareness(doc);
     // У сервера нет собственного присутствия.
     this.awareness.setLocalState(null);
     this.awareness.on('update', ({ added, updated, removed }: { added: number[]; updated: number[]; removed: number[] }) => {
       const changed = [...added, ...updated, ...removed];
       if (!changed.length) return;
-      const encoder = encoding.createEncoder();
-      encoding.writeVarUint(encoder, MessageType.Awareness);
-      encoding.writeVarUint8Array(encoder, awarenessProtocol.encodeAwarenessUpdate(this.awareness, changed));
-      this.broadcast(encoding.toUint8Array(encoder));
+      let full: Uint8Array | null = null;
+      let hidden: Uint8Array | null = null;
+      for (const c of this.conns) {
+        if (!c.ready) continue;
+        if (this.seesStudentCursors(c)) c.send((full ??= this.awarenessFrame(changed, false)));
+        else c.send((hidden ??= this.awarenessFrame(changed, true)));
+      }
     });
+  }
+
+  /**
+   * Видит ли участник курсоры учеников. Если учитель выключил настройку
+   * showStudentCursors, состояния учеников уходят остальным ученикам без
+   * курсора, выделения и вида (адресная рассылка): в списке участников
+   * ученик виден, но где он и что выделил — только учителям.
+   */
+  private seesStudentCursors(conn: Connection): boolean {
+    return this.meta.settings.showStudentCursors || conn.caps.role === 'owner' || conn.caps.role === 'teacher';
+  }
+
+  /** Кадр awareness для набора clientID; hideStudents — без курсоров учеников. */
+  private awarenessFrame(clients: number[], hideStudents: boolean): Uint8Array {
+    const encoder = encoding.createEncoder();
+    encoding.writeVarUint(encoder, MessageType.Awareness);
+    if (!hideStudents) {
+      encoding.writeVarUint8Array(encoder, awarenessProtocol.encodeAwarenessUpdate(this.awareness, clients));
+      return encoding.toUint8Array(encoder);
+    }
+    const inner = encoding.createEncoder();
+    const states = this.awareness.getStates();
+    encoding.writeVarUint(inner, clients.length);
+    for (const id of clients) {
+      const clock = this.awareness.meta.get(id)?.clock ?? 0;
+      let state = (states.get(id) as Record<string, unknown> | undefined) ?? null;
+      if (state && (state.user as { role?: string } | undefined)?.role === 'STUDENT') {
+        state = { ...state, cursor: null, selection: [], viewport: null };
+      }
+      encoding.writeVarUint(inner, id);
+      encoding.writeVarUint(inner, clock);
+      encoding.writeVarString(inner, JSON.stringify(state));
+    }
+    encoding.writeVarUint8Array(encoder, encoding.toUint8Array(inner));
+    return encoding.toUint8Array(encoder);
   }
 
   static async load(app: FastifyInstance, boardId: string, persistenceOpts: PersistenceOptions): Promise<Room> {
@@ -71,7 +112,7 @@ export class Room {
     if (!board) throw new Error('Доска не найдена');
     const doc = await BoardPersistence.load(app.prisma, boardId, board.ownerId);
     const persistence = new BoardPersistence(app.prisma, boardId, doc, app.log, persistenceOpts);
-    return new Room(
+    const room = new Room(
       app,
       boardId,
       doc,
@@ -85,6 +126,8 @@ export class Room {
       },
       await loadModeratorIds(app.prisma, boardId),
     );
+    await room.lesson.loadChalk();
+    return room;
   }
 
   attach(conn: Connection): void {
@@ -100,6 +143,29 @@ export class Room {
     if (conn.awarenessClients.size) {
       awarenessProtocol.removeAwarenessStates(this.awareness, [...conn.awarenessClients], 'disconnect');
     }
+    this.lesson.onDetach(conn);
+  }
+
+  /**
+   * Правка документа от имени сервера (очистка, восстановление версии):
+   * результат уходит всем участникам и в журнал сохранения.
+   */
+  applyServerChange<T>(fn: () => T): T {
+    const captured: Uint8Array[] = [];
+    const onUpdate = (u: Uint8Array) => captured.push(u);
+    this.doc.on('update', onUpdate);
+    let result: T;
+    try {
+      result = fn();
+    } finally {
+      this.doc.off('update', onUpdate);
+    }
+    if (captured.length) {
+      const all = captured.length === 1 ? captured[0]! : Y.mergeUpdates(captured);
+      this.broadcast(syncUpdateFrame(all));
+      this.persistence.enqueue(all);
+    }
+    return result;
   }
 
   broadcast(data: Uint8Array, except?: Connection): void {
@@ -242,10 +308,7 @@ export class Room {
   private sendAwarenessTo(conn: Connection): void {
     const clients = [...this.awareness.getStates().keys()];
     if (!clients.length) return;
-    const encoder = encoding.createEncoder();
-    encoding.writeVarUint(encoder, MessageType.Awareness);
-    encoding.writeVarUint8Array(encoder, awarenessProtocol.encodeAwarenessUpdate(this.awareness, clients));
-    conn.send(encoding.toUint8Array(encoder));
+    conn.send(this.awarenessFrame(clients, !this.seesStudentCursors(conn)));
   }
 
   private handleControl(conn: Connection, msg: ClientControlMessage): void {
@@ -277,10 +340,9 @@ export class Room {
           settings: this.meta.settings,
         },
         capabilities: conn.caps,
-        // Мел, руки и «Следуйте за мной» обслуживаются модулем урока (этап 4.1).
-        chalkHolders: [],
-        hands: [],
-        follow: null,
+        chalkHolders: [...this.lesson.chalkHolders],
+        hands: this.lesson.hands,
+        follow: this.lesson.follow,
       });
       const encoder = encoding.createEncoder();
       encoding.writeVarUint(encoder, MessageType.Sync);
@@ -294,9 +356,7 @@ export class Room {
       conn.sendControl({ t: 'pong', ts: msg.ts, serverTime: Date.now() });
       return;
     }
-    // Команды управления уроком (режим, мел, «Следуйте за мной», руки,
-    // очистка) реализуются на этапе 4.1.
-    conn.sendControl({ t: 'error', code: 'NOT_AVAILABLE', message: 'Команда пока недоступна на сервере' });
+    this.lesson.handle(conn, msg as LessonCommand);
   }
 
   // ------------------------------------------------------------------
@@ -307,13 +367,14 @@ export class Room {
    * Пересчёт прав всех подключённых (после смены доступа, режима, настроек,
    * роли пользователя). Потерявшие доступ отключаются.
    */
-  async refreshAccess(): Promise<void> {
+  async refreshAccess(modeBy?: string): Promise<void> {
     const board = await this.app.prisma.board.findFirst({ where: { id: this.boardId, deletedAt: null } });
     if (!board) {
       for (const c of this.conns) c.close(CloseCode.NotFound, 'Доска удалена');
       return;
     }
     const settingsChanged = JSON.stringify(parseBoardSettings(board.settings)) !== JSON.stringify(this.meta.settings);
+    const modeChanged = board.mode !== this.meta.mode;
     this.meta = {
       title: board.title,
       kind: board.kind as (typeof BOARD_KINDS)[number],
@@ -322,6 +383,10 @@ export class Room {
       settings: parseBoardSettings(board.settings),
     };
     this.guard.moderatorIds = await loadModeratorIds(this.app.prisma, this.boardId);
+    // Мел снимается у потерявших доступ (setAccess) — сверяем с БД.
+    const chalkBefore = [...this.lesson.chalkHolders].sort().join();
+    await this.lesson.loadChalk();
+    const chalkChanged = [...this.lesson.chalkHolders].sort().join() !== chalkBefore;
     for (const conn of [...this.conns]) {
       const status = await this.app.userStatus.get(conn.user.id);
       if (!status || !status.active) {
@@ -339,14 +404,19 @@ export class Room {
       conn.facts = access.facts;
       if (!conn.ready) continue;
       if (settingsChanged) conn.sendControl({ t: 'settings.changed', settings: this.meta.settings });
+      if (modeChanged) conn.sendControl({ t: 'mode.changed', mode: this.meta.mode, by: modeBy ?? this.meta.ownerId });
+      if (chalkChanged) conn.sendControl({ t: 'chalk.changed', holders: [...this.lesson.chalkHolders] });
       if (changed) {
         conn.sendControl({ t: 'capabilities', capabilities: access.caps });
-        conn.sendControl({ t: 'notice', level: 'info', code: 'RIGHTS_CHANGED', message: 'Ваши права на доске изменились' });
+        // О смене режима и мела клиент сообщает сам, понятнее общего «права изменились».
+        if (!modeChanged && !chalkChanged) conn.sendControl({ t: 'notice', level: 'info', code: 'RIGHTS_CHANGED', message: 'Ваши права на доске изменились' });
       }
     }
   }
 
   async destroy(): Promise<void> {
+    this.lesson.destroy();
+    await this.lesson.idle();
     await this.persistence.close();
     this.awareness.destroy();
     this.doc.destroy();

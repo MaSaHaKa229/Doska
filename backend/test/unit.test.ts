@@ -4,6 +4,8 @@ import { PasswordHasher, generateTempPassword } from '../src/auth/password.js';
 import { TokenService } from '../src/auth/tokens.js';
 import { sanitizeDetails } from '../src/common/logger.js';
 import { ConfigError, loadConfig } from '../src/config/env.js';
+import * as Y from 'yjs';
+import { removeObjects } from '../src/realtime/lesson.js';
 
 describe('пароли', () => {
   it('временный пароль соответствует политике и читаем', () => {
@@ -82,5 +84,36 @@ describe('журнал и конфигурация', () => {
     expect(c.cookieSecure).toBe(true);
     expect(c.jwt.accessTtlSeconds).toBe(900);
     expect(c.argon2.memoryCost).toBe(65536);
+  });
+});
+
+describe('удаление объектов сервером (очистка)', () => {
+  function docWith(objs: { id: string; type?: string; groupId?: string | null }[]) {
+    const doc = new Y.Doc();
+    const map = doc.getMap('objects');
+    for (const o of objs) map.set(o.id, new Y.Map<unknown>([['type', o.type ?? 'core.stroke'], ['groupId', o.groupId ?? null]]));
+    return { doc, map: map as Y.Map<Y.Map<unknown>> };
+  }
+
+  it('пустые группы удаляются по цепочке, дети удалённой группы переходят к её родителю', () => {
+    const { doc, map } = docWith([
+      { id: 'outer', type: 'core.group' },
+      { id: 'inner', type: 'core.group', groupId: 'outer' },
+      { id: 'a', groupId: 'inner' },
+      { id: 'b', groupId: 'inner' },
+      { id: 'g2', type: 'core.group' },
+      { id: 'c', groupId: 'g2' },
+      { id: 'keep', groupId: 'g2' },
+    ]);
+    // Удаляются все дети inner (а затем пустые inner и outer) и сама g2 — её ребёнок keep остаётся без группы.
+    expect(removeObjects(doc, ['a', 'b', 'g2', 'c', 'missing'])).toBe(6);
+    expect([...map.keys()]).toEqual(['keep']);
+    expect(map.get('keep')!.get('groupId')).toBeNull();
+  });
+
+  it('группа с оставшимися детьми сохраняется', () => {
+    const { doc, map } = docWith([{ id: 'g', type: 'core.group' }, { id: 'x', groupId: 'g' }, { id: 'y', groupId: 'g' }]);
+    expect(removeObjects(doc, ['x'])).toBe(1);
+    expect([...map.keys()].sort()).toEqual(['g', 'y']);
   });
 });

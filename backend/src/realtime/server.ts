@@ -115,6 +115,13 @@ declare module 'fastify' {
   }
 }
 
+/** IP клиента для журнала: за обратным прокси (TRUST_PROXY) — из X-Forwarded-For. */
+function clientIp(req: IncomingMessage, trustProxy: boolean): string {
+  const fwd = req.headers['x-forwarded-for'];
+  if (trustProxy && typeof fwd === 'string' && fwd.trim()) return fwd.split(',')[0]!.trim();
+  return req.socket.remoteAddress ?? '';
+}
+
 function reject(socket: Duplex, status: number, text: string): void {
   socket.write(`HTTP/1.1 ${status} ${text}\r\nConnection: close\r\nContent-Length: 0\r\n\r\n`);
   socket.destroy();
@@ -196,13 +203,15 @@ export function registerRealtime(app: FastifyInstance, partial: Partial<Realtime
       if (ws.readyState !== ws.OPEN) return;
 
       const room = await manager.acquire(boardId);
-      const ip = req.socket.remoteAddress ?? '';
+      const ip = clientIp(req, app.config.trustProxy);
+      const ua = req.headers['user-agent'];
       const conn = new Connection(
         ws,
         { id: status.id, login: status.login, fullName: status.fullName, role: status.role, color: status.color },
         ip,
         access.caps,
         access.facts,
+        typeof ua === 'string' ? ua : null,
       );
       room.attach(conn);
       ws.on('close', () => {
@@ -236,12 +245,12 @@ export function registerRealtime(app: FastifyInstance, partial: Partial<Realtime
       disabled ? 'Учётная запись заблокирована' : 'Сессия завершена',
     );
   });
-  const refresh = async (boardId: string) => {
+  const refresh = async (boardId: string, by?: string) => {
     const room = await manager.peek(boardId);
-    if (room) await room.refreshAccess().catch((err) => app.log.error({ err, boardId }, 'Ошибка пересчёта прав'));
+    if (room) await room.refreshAccess(by).catch((err) => app.log.error({ err, boardId }, 'Ошибка пересчёта прав'));
   };
   app.events.on('board.accessChanged', ({ boardId }) => void refresh(boardId));
-  app.events.on('board.updated', ({ boardId }) => void refresh(boardId));
+  app.events.on('board.updated', ({ boardId, by }) => void refresh(boardId, by));
   app.events.on('board.deleted', ({ boardId }) => void refresh(boardId));
   app.events.on('user.updated', ({ userId }) => {
     void manager.loadedRooms().then(async (rooms) => {

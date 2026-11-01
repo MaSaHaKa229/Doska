@@ -3,6 +3,7 @@ import type {
   BoardDetails,
   BoardMode,
   BoardSummary,
+  DirectoryUser,
   FolderView,
   Paginated,
 } from '@doska/shared';
@@ -30,12 +31,18 @@ export const boardsApi = {
   get: (id: string) => http.get<{ board: BoardDetails }>(`/api/boards/${id}`),
   create: (body: { title: string; description?: string; folderId?: string | null; mode?: BoardMode; classIds?: string[]; studentIds?: string[] }) =>
     http.post<{ board: BoardDetails }>('/api/boards', body),
-  update: (id: string, body: { title?: string; description?: string | null; folderId?: string | null; sharedWithTeachers?: boolean }) =>
+  update: (
+    id: string,
+    body: { title?: string; description?: string | null; folderId?: string | null; sharedWithTeachers?: boolean; mode?: BoardMode },
+  ) =>
     http.patch<{ board: BoardDetails }>(`/api/boards/${id}`, body),
   setAccess: (id: string, body: { classIds: string[]; members: { userId: string; role: 'CO_TEACHER' | 'STUDENT' | 'VIEWER' }[] }) =>
     http.put<{ access: BoardAccessView }>(`/api/boards/${id}/access`, body),
   delete: (id: string) => http.delete<void>(`/api/boards/${id}`),
   myClasses: () => http.get<{ classes: TeacherClass[] }>('/api/boards/my-classes'),
+  /** Поиск учеников и учителей для выдачи доступа (только учитель). */
+  directory: (q: { role: 'STUDENT' | 'TEACHER'; search?: string; classId?: string; limit?: number }, signal?: AbortSignal) =>
+    http.get<{ users: DirectoryUser[] }>('/api/directory/users', { query: { ...q }, signal }),
 
   folders: () => http.get<{ folders: FolderView[] }>('/api/folders'),
   createFolder: (name: string, parentId: string | null) => http.post<{ folder: FolderView }>('/api/folders', { name, parentId }),

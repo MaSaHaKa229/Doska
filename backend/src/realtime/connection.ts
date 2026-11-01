@@ -47,6 +47,7 @@ export class Connection {
     readonly ip: string,
     caps: BoardCapabilities,
     facts: BoardAccessFacts,
+    readonly userAgent: string | null = null,
   ) {
     this.caps = caps;
     this.facts = facts;

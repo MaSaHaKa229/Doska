@@ -20,13 +20,13 @@ import {
   BACKGROUND_KINDS,
   BACKGROUND_LABELS,
   TOOL_GROUP_LABELS,
-  noWriteHint,
   type InspectorField,
   type PageRecord,
   type ToolGroup,
 } from '@doska/shared';
 import type { BoardModel } from '../../collab/model';
 import { registry } from '../../plugins/registry';
+import { toolUnavailable } from '../../tools/availability';
 import { useBoard, currentCamera } from '../../store/board';
 import { toolIcon } from '../../ui/icons';
 import { Button } from '../../ui/Button';
@@ -51,7 +51,6 @@ export function Toolbar() {
   const setTool = useBoard((s) => s.setTool);
   const tools = registry.listTools();
   const groups = GROUP_ORDER.map((g) => ({ group: g, tools: tools.filter((t) => t.group === g) })).filter((g) => g.tools.length);
-  const hint = caps && !caps.write ? noWriteHint(caps.noWriteReason) : null;
 
   return (
     <nav className="board-toolbar" aria-label="Инструменты">
@@ -59,7 +58,8 @@ export function Toolbar() {
         <div key={group} className="board-toolbar__group" role="group" aria-label={TOOL_GROUP_LABELS[group]}>
           {list.map((t) => {
             const Icon = toolIcon(t.icon);
-            const disabled = t.requiresWrite && !caps?.write;
+            const reason = toolUnavailable(t, caps);
+            const disabled = !!reason;
             return (
               <button
                 key={t.id}
@@ -67,7 +67,7 @@ export function Toolbar() {
                 className={`tool-btn${toolId === t.id ? ' active' : ''}`}
                 aria-pressed={toolId === t.id}
                 aria-label={t.title}
-                title={disabled ? `${t.title} — ${hint ?? 'нет права записи'}` : `${t.title}${t.hotkey ? ` (${t.hotkey})` : ''}`}
+                title={reason ? `${t.title} — ${reason}` : `${t.title}${t.hotkey ? ` (${t.hotkey})` : ''}`}
                 disabled={disabled}
                 onClick={() => setTool(t.id)}
               >

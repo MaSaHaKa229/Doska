@@ -18,6 +18,9 @@ import { PageTabs, PropertiesBar, Toolbar, ZoomControls } from './Panels';
 import type { CanvasTheme } from '../../objects/colors';
 import { CursorsLayer, Participants } from './PresenceUi';
 import { ViewMenu } from './ViewMenu';
+import { FollowBanner, HandButton, HandsIndicator, LessonMenu } from './LessonUi';
+import { LaserLayer } from './LaserLayer';
+import { useFollowLead, useFollowView } from './useFollow';
 import { CommandPalette, HelpDialog } from './Palette';
 import { coreCommands } from './boardCommands';
 import { pluralize } from '../../lib/format';
@@ -129,6 +132,8 @@ function BoardWorkspace({ session }: { session: BoardSession }) {
   const paletteCommands = useMemo(() => coreCommands(commands, model, { help: ui.help }), [commands, model, ui]);
   const pendingChanges = useBoard((s) => s.pendingChanges);
   useBoardShortcuts(commands, ui);
+  useFollowView(model, sizeRef);
+  useFollowLead(session, sizeRef);
 
   // Отладочный доступ для сквозных тестов (только в режиме разработки).
   useEffect(() => {
@@ -150,7 +155,7 @@ function BoardWorkspace({ session }: { session: BoardSession }) {
     const s = useBoard.getState();
     if (s.cameras[pageId]) return;
     const bounds = model.pageBounds(pageId);
-    s.setCamera(bounds ? fitRect(bounds, sizeRef.current, 64, 1) : { cx: 0, cy: 0, zoom: 1 });
+    s.setCamera(bounds ? fitRect(bounds, sizeRef.current, 64, 1) : { cx: 0, cy: 0, zoom: 1 }, 'system');
   }, [model, pageId, synced]);
 
   const st = STATUS[status];
@@ -167,7 +172,10 @@ function BoardWorkspace({ session }: { session: BoardSession }) {
         </h1>
         {board?.kind === 'LESSON' && <Badge kind="accent">{BOARD_MODE_LABELS[board.mode]}</Badge>}
         <span className="spacer" />
-        <Participants presence={session.presence} model={model} />
+        <HandsIndicator session={session} />
+        <HandButton session={session} />
+        <LessonMenu session={session} sizeRef={sizeRef} />
+        <Participants presence={session.presence} model={model} session={session} />
         <Badge
           kind={st.kind}
           title={
@@ -188,18 +196,22 @@ function BoardWorkspace({ session }: { session: BoardSession }) {
         <Button size="small" variant="ghost" iconOnly icon={<Redo2 size={18} />} aria-label="Повторить (Ctrl+Shift+Z)" title="Повторить (Ctrl+Shift+Z)" disabled={!canRedo} onClick={() => commands.redo()} />
       </header>
       <PropertiesBar model={model} commands={commands} theme={theme} />
-      {status === 'closed' && closedReason && (
-        <div className="board-banner">
-          <Alert kind="error">
-            {closedReason}. <Link to="/">Вернуться к списку досок</Link>
-          </Alert>
-        </div>
-      )}
-      {hint && (
-        <div className="board-hint" role="status">
-          <Lock size={14} /> {hint}
-        </div>
-      )}
+      {/* Полосы над холстом (отключение, показ учителя, подсказка) — одна строка сетки. */}
+      <div className="board-notices">
+        {status === 'closed' && closedReason && (
+          <div className="board-banner">
+            <Alert kind="error">
+              {closedReason}. <Link to="/">Вернуться к списку досок</Link>
+            </Alert>
+          </div>
+        )}
+        <FollowBanner />
+        {hint && (
+          <div className="board-hint" role="status">
+            <Lock size={14} /> {hint}
+          </div>
+        )}
+      </div>
       <div className="board-main">
         <Toolbar />
         <div className="board-canvas-wrap">
@@ -208,7 +220,8 @@ function BoardWorkspace({ session }: { session: BoardSession }) {
               <Loader2 size={20} className="spin" /> Загрузка доски…
             </div>
           )}
-          <BoardStage model={model} stageRef={stageRef} sizeRef={sizeRef} presence={session.presence} people={session.people} />
+          <BoardStage model={model} stageRef={stageRef} sizeRef={sizeRef} presence={session.presence} people={session.people} laser={session.laser} />
+          <LaserLayer presence={session.presence} laser={session.laser} sizeRef={sizeRef} />
           <CursorsLayer presence={session.presence} sizeRef={sizeRef} />
           <ZoomControls commands={commands} />
         </div>

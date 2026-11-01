@@ -141,6 +141,7 @@ export function shapeTool(kind: ShapeKind): ToolModule<ReactNode> {
 
 export const SELECT_TOOL_ID = 'core.select';
 export const HAND_TOOL_ID = 'core.hand';
+export const LASER_TOOL_ID = 'core.laser';
 
 /** Выделение и перемещение (логика — в ядре холста, canvas/interaction). */
 export const selectTool: ToolModule<ReactNode> = {
@@ -163,4 +164,21 @@ export const handTool: ToolModule<ReactNode> = {
   keywords: ['рука', 'перемещение', 'панорама', 'сдвинуть доску', 'hand'],
   requiresWrite: false,
   cursor: 'grab',
+};
+
+/**
+ * Лазерная указка: след виден всем и угасает за 1,5 с, в документ ничего не
+ * записывается. Ученикам доступна, если у них есть право записи и учитель
+ * не выключил настройку allowStudentLaser. Нажатия обрабатывает холст.
+ */
+export const laserTool: ToolModule<ReactNode> = {
+  id: LASER_TOOL_ID,
+  title: 'Лазерная указка',
+  icon: 'Zap',
+  group: 'select',
+  hotkey: 'K',
+  keywords: ['лазер', 'указка', 'показать', 'указать', 'laser', 'pointer'],
+  requiresWrite: false,
+  requiresCapability: 'laser',
+  cursor: 'crosshair',
 };

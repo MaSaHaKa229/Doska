@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { BoardCapabilities, BoardKind, BoardMode, BoardSettings, Rect } from '@doska/shared';
+import type { BoardCapabilities, BoardKind, BoardMode, BoardSettings, FollowState, RaisedHand, Rect } from '@doska/shared';
 import { DEFAULT_CAMERA, type Camera } from '../canvas/camera';
 import type { ShapeKind } from '../objects/shape';
 import type { SnapResult } from '../canvas/snapping';
@@ -23,7 +23,12 @@ export interface BoardInfo {
   settings: BoardSettings;
 }
 
+/** Кто меняет вид: пользователь или приложение (показ учителя, первое открытие). */
+export type ViewSource = 'user' | 'system';
+
 interface BoardState {
+  /** Текущий пользователь (для «я ли веду показ», «у меня ли мел»). */
+  userId: string | null;
   board: BoardInfo | null;
   caps: BoardCapabilities | null;
   status: ConnectionStatus;
@@ -48,13 +53,27 @@ interface BoardState {
   canUndo: boolean;
   canRedo: boolean;
 
+  // ----- Урок -----
+  chalkHolders: string[];
+  hands: RaisedHand[];
+  /** «Следуйте за мной»: текущий показ или null. */
+  follow: FollowState | null;
+  /** Ученик временно отошёл от вида учителя (показ не строгий). */
+  followDetached: boolean;
+
+  setUserId(id: string): void;
+  setChalkHolders(ids: string[]): void;
+  setHands(hands: RaisedHand[]): void;
+  setFollow(state: FollowState | null): void;
+  setFollowDetached(v: boolean): void;
   setBoard(board: BoardInfo, caps: BoardCapabilities): void;
   setCaps(caps: BoardCapabilities): void;
   setStatus(status: ConnectionStatus, closedReason?: string | null): void;
   setSynced(v: boolean): void;
   setPendingChanges(n: number): void;
-  setPage(pageId: string): void;
-  setCamera(cam: Camera): void;
+  /** source = 'user': во время строгого показа учителя игнорируется. */
+  setPage(pageId: string, source?: ViewSource): void;
+  setCamera(cam: Camera, source?: ViewSource): void;
   setTool(toolId: string): void;
   setPanning(v: boolean): void;
   setSelection(ids: string[]): void;
@@ -79,6 +98,7 @@ function loadToolOptions(): ToolOptions {
 }
 
 const initial = () => ({
+  userId: null,
   board: null,
   caps: null,
   status: 'connecting' as ConnectionStatus,
@@ -96,7 +116,32 @@ const initial = () => ({
   snapHint: null,
   canUndo: false,
   canRedo: false,
+  chalkHolders: [],
+  hands: [],
+  follow: null,
+  followDetached: false,
 });
+
+/**
+ * Следует ли пользователь за показом: показ идёт, ведёт его не он, и сам он
+ * показ вести не может (ученик, наблюдатель). Учителя-соведущие не
+ * перемещаются принудительно.
+ */
+export function isFollowing(s: Pick<BoardState, 'follow' | 'userId' | 'caps'>): boolean {
+  return !!s.follow && s.follow.leaderId !== s.userId && !s.caps?.leadFollow;
+}
+
+/**
+ * Можно ли пользователю сейчас самому менять вид. Во время строгого показа —
+ * нет; в нестрогом смена вида означает «временно отойти от учителя».
+ */
+function viewChange(get: () => BoardState, set: (p: Partial<BoardState>) => void, source: ViewSource): boolean {
+  const s = get();
+  if (source === 'system' || !isFollowing(s)) return true;
+  if (s.follow!.strict) return false;
+  if (!s.followDetached) set({ followDetached: true });
+  return true;
+}
 
 /** Состояние открытой доски (интерфейс; данные доски — в Y.Doc/BoardModel). */
 export const useBoard = create<BoardState>((set, get) => ({
@@ -106,11 +151,25 @@ export const useBoard = create<BoardState>((set, get) => ({
   setStatus: (status, closedReason = null) => set({ status, closedReason }),
   setSynced: (synced) => set({ synced }),
   setPendingChanges: (pendingChanges) => set({ pendingChanges }),
-  setPage: (pageId) => set({ pageId, selection: [], marquee: null }),
-  setCamera: (cam) => {
-    const pageId = get().pageId;
-    if (pageId) set({ cameras: { ...get().cameras, [pageId]: cam } });
+  setPage: (pageId, source = 'user') => {
+    if (!viewChange(get, set, source)) return;
+    set({ pageId, selection: [], marquee: null });
   },
+  setCamera: (cam, source = 'user') => {
+    const pageId = get().pageId;
+    if (!pageId || !viewChange(get, set, source)) return;
+    set({ cameras: { ...get().cameras, [pageId]: cam } });
+  },
+  setUserId: (userId) => set({ userId }),
+  setChalkHolders: (chalkHolders) => set({ chalkHolders }),
+  setHands: (hands) => set({ hands }),
+  setFollow: (follow) => {
+    const prev = get().follow;
+    // Новый показ (или другой ведущий) — снова следовать за учителем.
+    const restarted = !prev || !follow || prev.leaderId !== follow.leaderId;
+    set({ follow, ...(restarted ? { followDetached: false } : {}) });
+  },
+  setFollowDetached: (followDetached) => set({ followDetached }),
   setTool: (toolId) => set({ toolId, preview: null }),
   setPanning: (panning) => set({ panning }),
   setSelection: (selection) => set({ selection }),

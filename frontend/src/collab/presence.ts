@@ -91,6 +91,10 @@ export class Presence {
     this.patch({ tool });
   }
 
+  setLaser(laser: AwarenessState['laser']): void {
+    this.patch({ laser });
+  }
+
   setViewport(v: Viewport): void {
     this.pendingViewport = v;
     this.viewportTimer ??= setTimeout(() => {

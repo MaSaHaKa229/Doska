@@ -1,7 +1,10 @@
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
-import { Users } from 'lucide-react';
+import { Eraser, Hand, Pencil, Users } from 'lucide-react';
 import { USER_ROLE_LABELS } from '@doska/shared';
 import type { BoardModel } from '../../collab/model';
+import type { BoardSession } from '../../collab/session';
+import { Button } from '../../ui/Button';
+import { ConfirmDialog } from '../../ui/ConfirmDialog';
 import { cursorVisible, groupParticipants, type Presence } from '../../collab/presence';
 import { useBoard, currentCamera } from '../../store/board';
 import { worldToScreen, type Size } from '../../canvas/camera';
@@ -47,9 +50,18 @@ export function CursorsLayer({ presence, sizeRef }: { presence: Presence; sizeRe
   );
 }
 
-/** Присутствующие на доске: аватары в шапке и список по нажатию. */
-export function Participants({ presence, model }: { presence: Presence; model: BoardModel }) {
+/**
+ * Присутствующие на доске: аватары в шапке и список по нажатию. У учеников
+ * видны мел и поднятая рука; учитель отсюда даёт и забирает мел и удаляет
+ * записи конкретного ученика.
+ */
+export function Participants({ presence, model, session }: { presence: Presence; model: BoardModel; session?: BoardSession }) {
   const peers = usePeers(presence);
+  const caps = useBoard((s) => s.caps);
+  const mode = useBoard((s) => s.board?.mode);
+  const chalkHolders = useBoard((s) => s.chalkHolders);
+  const hands = useBoard((s) => s.hands);
+  const [clearFor, setClearFor] = useState<{ id: string; name: string } | null>(null);
   const me = useAuth((s) => s.user);
   const setPage = useBoard((s) => s.setPage);
   const [open, setOpen] = useState(false);
@@ -104,30 +116,90 @@ export function Participants({ presence, model }: { presence: Presence; model: B
               </div>
             </div>
           )}
-          {list.map((p) => (
-            <button
-              key={p.user.id}
-              type="button"
-              className="participant participant--btn"
-              title={p.pageId ? 'Перейти на страницу участника' : undefined}
-              onClick={() => {
-                if (p.pageId && model.page(p.pageId)) setPage(p.pageId);
-                setOpen(false);
-              }}
-            >
-              <Avatar name={p.user.fullName} color={p.user.color} size={26} />
-              <div>
-                <div>{p.user.fullName}</div>
-                <div className="small muted">
-                  {USER_ROLE_LABELS[p.user.role]}
-                  {pageTitle(p.pageId) ? ` · ${pageTitle(p.pageId)}` : ''}
-                  {p.connections > 1 ? ` · устройств: ${p.connections}` : ''}
-                </div>
+          {list.map((p) => {
+            const student = p.user.role === 'STUDENT';
+            const hasChalk = chalkHolders.includes(p.user.id);
+            const handUp = hands.some((h) => h.userId === p.user.id);
+            return (
+              <div key={p.user.id} className="participant" data-testid="participant">
+                <button
+                  type="button"
+                  className="participant participant--btn"
+                  style={{ padding: 0, flex: 1, minWidth: 0 }}
+                  title={p.pageId ? 'Перейти на страницу участника' : undefined}
+                  onClick={() => {
+                    if (p.pageId && model.page(p.pageId)) setPage(p.pageId);
+                    setOpen(false);
+                  }}
+                >
+                  <Avatar name={p.user.fullName} color={p.user.color} size={26} />
+                  <div style={{ minWidth: 0 }}>
+                    <div>
+                      {p.user.fullName}{' '}
+                      <span className="participant__marks">
+                        {hasChalk && <Pencil size={13} aria-label="с мелом" />}
+                        {handUp && <Hand size={13} className="hand-raised" aria-label="поднял(а) руку" />}
+                      </span>
+                    </div>
+                    <div className="small muted">
+                      {USER_ROLE_LABELS[p.user.role]}
+                      {pageTitle(p.pageId) ? ` · ${pageTitle(p.pageId)}` : ''}
+                      {p.connections > 1 ? ` · устройств: ${p.connections}` : ''}
+                    </div>
+                  </div>
+                </button>
+                {session && student && caps?.manageLesson && (
+                  <span className="participant__actions">
+                    {(mode === 'SELECTIVE' || hasChalk) && (
+                      <Button
+                        size="small"
+                        variant="ghost"
+                        iconOnly
+                        className={hasChalk ? 'is-active' : undefined}
+                        icon={<Pencil size={16} />}
+                        aria-pressed={hasChalk}
+                        aria-label={hasChalk ? `Забрать мел: ${p.user.fullName}` : `Дать мел: ${p.user.fullName}`}
+                        title={hasChalk ? 'Забрать мел' : 'Дать мел'}
+                        onClick={() => session.send({ t: 'chalk.set', userId: p.user.id, granted: !hasChalk })}
+                      />
+                    )}
+                    {caps.clearStudentObjects && (
+                      <Button
+                        size="small"
+                        variant="ghost"
+                        iconOnly
+                        icon={<Eraser size={16} />}
+                        aria-label={`Удалить записи: ${p.user.fullName}`}
+                        title="Удалить все записи ученика"
+                        onClick={() => setClearFor({ id: p.user.id, name: p.user.fullName })}
+                      />
+                    )}
+                  </span>
+                )}
               </div>
-            </button>
-          ))}
+            );
+          })}
           {list.length === 0 && <div className="small muted" style={{ padding: '4px 10px 8px' }}>Кроме вас никого нет</div>}
         </div>
+      )}
+      {session && (
+        <ConfirmDialog
+          open={clearFor !== null}
+          title="Удалить записи ученика?"
+          confirmLabel="Удалить"
+          danger
+          message={
+            <>
+              Будут удалены все объекты, созданные учеником {clearFor?.name}, на всех страницах доски. Перед удалением сохраняется версия
+              доски.
+            </>
+          }
+          onClose={() => setClearFor(null)}
+          onConfirm={() => {
+            if (clearFor) session.send({ t: 'objects.clearByAuthors', authors: [clearFor.id], pageId: null });
+            setClearFor(null);
+          }}
+        />
       )}
     </div>
   );

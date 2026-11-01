@@ -162,6 +162,6 @@ export class BoardCommands {
     const pages = this.model.pages();
     const i = pages.findIndex((p) => p.id === this.store.pageId);
     const next = pages[i + delta];
-    if (next) this.store.setPage(next.id);
+    if (next) this.store.setPage(next.id, 'system');
   }
 }

@@ -1,4 +1,4 @@
-import type { Point, Rect } from '@doska/shared';
+import type { Point, Rect, Viewport } from '@doska/shared';
 
 /**
  * Камера: мировая точка в центре экрана и масштаб.
@@ -79,4 +79,31 @@ export function wheelIntent(e: { ctrlKey: boolean; metaKey: boolean; deltaMode: 
 export function wheelZoomFactor(deltaY: number, deltaMode: number): number {
   const px = deltaMode === 1 ? deltaY * 16 : deltaMode === 2 ? deltaY * 400 : deltaY;
   return Math.exp(-px * 0.0015);
+}
+
+/** Вид для протокола: центр, масштаб и видимая мировая область. */
+export function cameraToViewport(cam: Camera, size: Size, pageId: string): Viewport {
+  return { pageId, centerX: cam.cx, centerY: cam.cy, zoom: cam.zoom, w: size.width / cam.zoom, h: size.height / cam.zoom };
+}
+
+/**
+ * «Следуйте за мной»: камера, показывающая ту же мировую область, что у
+ * ведущего, в окне другого размера. Центр сохраняется, масштаб подгоняется
+ * так, чтобы область поместилась целиком. Без размера области (старый
+ * клиент) — масштаб ведущего как есть.
+ */
+export function cameraForViewport(v: Viewport, size: Size): Camera {
+  if (!v.w || !v.h) return { cx: v.centerX, cy: v.centerY, zoom: clampZoom(v.zoom) };
+  const zoom = clampZoom(Math.min(size.width / v.w, size.height / v.h));
+  return { cx: v.centerX, cy: v.centerY, zoom };
+}
+
+/** Промежуточная камера анимации перехода (t ∈ [0, 1]); масштаб — по логарифму. */
+export function lerpCamera(a: Camera, b: Camera, t: number): Camera {
+  const k = Math.min(1, Math.max(0, t));
+  return {
+    cx: a.cx + (b.cx - a.cx) * k,
+    cy: a.cy + (b.cy - a.cy) * k,
+    zoom: Math.exp(Math.log(a.zoom) + (Math.log(b.zoom) - Math.log(a.zoom)) * k),
+  };
 }

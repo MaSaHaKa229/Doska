@@ -35,6 +35,8 @@ export const updateBoardSchema = z
     settings: boardSettingsSchema.partial().optional(),
     /** Для конспекта ученика: показывать учителям. */
     sharedWithTeachers: z.boolean().optional(),
+    /** Режим доски урока (учитель). То же делает команда mode.set по WebSocket. */
+    mode: z.enum(BOARD_MODES).optional(),
   })
   .refine((v) => Object.values(v).some((x) => x !== undefined), 'Нет изменений');
 export type UpdateBoardRequest = z.infer<typeof updateBoardSchema>;
@@ -67,6 +69,25 @@ export const setBoardAccessSchema = z.object({
   members: z.array(boardMemberInputSchema).max(1000),
 });
 export type SetBoardAccessRequest = z.infer<typeof setBoardAccessSchema>;
+
+/** Поиск людей для выдачи доступа к доске (учитель). */
+export const directoryQuerySchema = z.object({
+  role: z.enum(['STUDENT', 'TEACHER']),
+  search: z.string().trim().max(100).default(''),
+  /** Только ученики этого класса (из классов учителя). */
+  classId: uuid.optional(),
+  limit: z.coerce.number().int().min(1).max(100).default(30),
+});
+export type DirectoryQuery = z.infer<typeof directoryQuerySchema>;
+
+export interface DirectoryUser {
+  id: string;
+  fullName: string;
+  login: string;
+  role: 'STUDENT' | 'TEACHER';
+  /** Действующие классы пользователя (для различения однофамильцев). */
+  classes: string[];
+}
 
 export const folderNameSchema = z.string().trim().min(1, 'Укажите название папки').max(200);
 

@@ -77,6 +77,13 @@ export const viewportSchema = z.object({
   centerX: finite,
   centerY: finite,
   zoom: z.number().finite().min(0.01).max(100),
+  /**
+   * Размер видимой области в мировых единицах (ширина и высота экрана /
+   * zoom). Нужен для «Следуйте за мной»: ученик вписывает ту же область в
+   * своё окно. Необязателен для совместимости со старыми клиентами.
+   */
+  w: z.number().finite().positive().max(1e7).optional(),
+  h: z.number().finite().positive().max(1e7).optional(),
 });
 export type Viewport = z.infer<typeof viewportSchema>;
 

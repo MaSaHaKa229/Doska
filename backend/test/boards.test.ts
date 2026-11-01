@@ -155,6 +155,22 @@ describe('доски', () => {
     expect((await outsider.request('GET', `/api/boards/${b.id}/people`)).statusCode).toBe(404);
   });
 
+  it('поиск людей для доступа: только учителю, по ФИО и логину, фильтр по своему классу', async () => {
+    const all = (await teacher.request('GET', '/api/directory/users?role=STUDENT')).json().users;
+    expect(all.map((u: { fullName: string }) => u.fullName)).toEqual(['Ученик Другой', 'Ученик Класса']);
+    expect(all.find((u: { id: string }) => u.id === ids.student).classes).toEqual(['9А']);
+    const byLogin = (await teacher.request('GET', '/api/directory/users?role=STUDENT&search=OUTS')).json().users;
+    expect(byLogin.map((u: { id: string }) => u.id)).toEqual([ids.outsider]);
+    const inClass = (await teacher.request('GET', `/api/directory/users?role=STUDENT&classId=${ids.cls}`)).json().users;
+    expect(inClass.map((u: { id: string }) => u.id)).toEqual([ids.student]);
+    // Чужой класс — ошибка проверки; себя в списке учителей нет.
+    expect((await teacher.request('GET', `/api/directory/users?role=STUDENT&classId=${ids.otherCls}`)).statusCode).toBe(400);
+    const teachers = (await teacher.request('GET', '/api/directory/users?role=TEACHER')).json().users;
+    expect(teachers.map((u: { id: string }) => u.id)).toEqual([ids.teacher2]);
+    expect((await student.request('GET', '/api/directory/users?role=STUDENT')).statusCode).toBe(403);
+    expect((await admin.request('GET', '/api/directory/users?role=STUDENT')).statusCode).toBe(403);
+  });
+
   it('мои классы', async () => {
     const res = (await teacher.request('GET', '/api/boards/my-classes')).json();
     expect(res.classes).toEqual([{ id: ids.cls, name: '9А', academicYear: null, studentCount: 1 }]);

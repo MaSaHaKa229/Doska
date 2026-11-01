@@ -11,6 +11,7 @@ import {
   Search,
   Trash2,
   Users,
+  KeyRound,
 } from 'lucide-react';
 import { BOARD_MODE_LABELS, type BoardSummary, type FolderView, type Me } from '@doska/shared';
 import { boardsApi } from '../../api/boards';
@@ -24,6 +25,7 @@ import { ConfirmDialog } from '../../ui/ConfirmDialog';
 import { Alert, Badge, EmptyState, Pagination, Spinner } from '../../ui/misc';
 import { CreateBoardDialog, FolderDialog, MoveBoardDialog, RenameBoardDialog } from './BoardDialogs';
 import { descendantsOf, flattenFolders } from './folderTree';
+import { AccessDialog } from './AccessDialog';
 
 const PAGE_SIZE = 24;
 
@@ -64,6 +66,7 @@ export function BoardsSection({ user }: { user: Me }) {
   const [renaming, setRenaming] = useState<BoardSummary | null>(null);
   const [moving, setMoving] = useState<BoardSummary | null>(null);
   const [deleting, setDeleting] = useState<BoardSummary | null>(null);
+  const [accessFor, setAccessFor] = useState<BoardSummary | null>(null);
   const [folderDialog, setFolderDialog] = useState<{ folder: FolderView | null; parentId: string | null } | null>(null);
   const [deletingFolder, setDeletingFolder] = useState<FolderView | null>(null);
   const [busy, setBusy] = useState(false);
@@ -206,13 +209,19 @@ export function BoardsSection({ user }: { user: Me }) {
                   <Link to={`/boards/${b.id}`} className="btn btn--small btn--primary">
                     Открыть
                   </Link>
-                  {b.role === 'owner' && (
+                  {(b.role === 'owner' || b.role === 'teacher') && (
                     <ActionMenu
                       label={`Действия с доской ${b.title}`}
                       items={[
-                        { label: 'Переименовать', icon: <Pencil size={16} />, onSelect: () => setRenaming(b) },
-                        { label: 'Переместить в папку', icon: <FolderInput size={16} />, onSelect: () => setMoving(b) },
-                        { label: 'Удалить', icon: <Trash2 size={16} />, danger: true, onSelect: () => setDeleting(b) },
+                        {
+                          label: 'Доступ…',
+                          icon: <KeyRound size={16} />,
+                          hidden: b.kind !== 'LESSON' && b.kind !== 'TEMPLATE',
+                          onSelect: () => setAccessFor(b),
+                        },
+                        { label: 'Переименовать', icon: <Pencil size={16} />, hidden: b.role !== 'owner', onSelect: () => setRenaming(b) },
+                        { label: 'Переместить в папку', icon: <FolderInput size={16} />, hidden: b.role !== 'owner', onSelect: () => setMoving(b) },
+                        { label: 'Удалить', icon: <Trash2 size={16} />, danger: true, hidden: b.role !== 'owner', onSelect: () => setDeleting(b) },
                       ]}
                     />
                   )}
@@ -238,6 +247,9 @@ export function BoardsSection({ user }: { user: Me }) {
           reloadAll();
         }}
       />
+      {accessFor && (
+        <AccessDialog boardId={accessFor.id} title={accessFor.title} open onClose={() => setAccessFor(null)} onSaved={() => list.reload()} />
+      )}
       <RenameBoardDialog
         board={renaming}
         onClose={() => setRenaming(null)}

@@ -12,8 +12,9 @@ import { DEFAULT_CAMERA, panBy, screenToWorld, viewportRect, wheelIntent, wheelZ
 import { drawBackground, type Ctx2D } from './background';
 import { findSnap, gridSnap, SNAP_LABELS, type SnapResult } from './snapping';
 import { resolveColor, SURFACE_COLORS, type CanvasTheme } from '../objects/colors';
-import { HAND_TOOL_ID, SELECT_TOOL_ID } from '../tools/shape-tools';
-import { noWriteHint } from '@doska/shared';
+import { HAND_TOOL_ID, LASER_TOOL_ID, SELECT_TOOL_ID } from '../tools/shape-tools';
+import { toolUnavailable } from '../tools/availability';
+import type { LaserPointer } from '../collab/laser';
 import { toast } from '../store/toast';
 
 /** Допуск попадания курсора, экранные пиксели. */
@@ -123,6 +124,7 @@ type Interaction =
   | { kind: 'idle' }
   | { kind: 'pan'; last: Point; pointerId: number }
   | { kind: 'pinch' }
+  | { kind: 'laser'; pointerId: number }
   | { kind: 'marquee'; start: Point; additive: boolean; base: string[]; pointerId: number }
   | {
       kind: 'move';
@@ -150,6 +152,8 @@ export interface BoardStageProps {
   /** Присутствие (курсоры, выделения других) — нет в автономных тестах холста. */
   presence?: Presence;
   people?: PeopleDirectory;
+  /** Лазерная указка текущего пользователя. */
+  laser?: LaserPointer;
 }
 
 const NO_PEERS: never[] = [];
@@ -162,7 +166,7 @@ function formatTime(ms: number): string {
   return d.toLocaleString('ru-RU', sameDay ? { hour: '2-digit', minute: '2-digit' } : { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
 }
 
-export function BoardStage({ model, stageRef: externalStageRef, sizeRef: externalSizeRef, presence, people }: BoardStageProps) {
+export function BoardStage({ model, stageRef: externalStageRef, sizeRef: externalSizeRef, presence, people, laser }: BoardStageProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const stageRef = useRef<Konva.Stage | null>(null);
   const transformerRef = useRef<Konva.Transformer | null>(null);
@@ -407,6 +411,17 @@ export function BoardStage({ model, stageRef: externalStageRef, sizeRef: externa
     }
     if (e.button !== 0) return;
 
+    // Лазерная указка: след в присутствии, документ не меняется.
+    if (toolId === LASER_TOOL_ID && tool) {
+      const unavailable = toolUnavailable(tool, caps);
+      if (unavailable) toast.info(unavailable);
+      else if (laser) {
+        interaction.current = { kind: 'laser', pointerId: e.pointerId };
+        laser.down(pageId, world);
+      }
+      return;
+    }
+
     if (toolId === SELECT_TOOL_ID || !tool?.onPointerDown) {
       const handle = handleAt(world);
       if (handle) {
@@ -452,8 +467,9 @@ export function BoardStage({ model, stageRef: externalStageRef, sizeRef: externa
     }
 
     // Инструмент плагина.
-    if (tool.requiresWrite && !caps?.write) {
-      toast.info(noWriteHint(caps?.noWriteReason ?? 'read-only') ?? 'Нет права записи');
+    const unavailable = toolUnavailable(tool, caps);
+    if (unavailable) {
+      toast.info(unavailable);
       return;
     }
     if (!model.canCreateOn(pageId)) {
@@ -489,6 +505,10 @@ export function BoardStage({ model, stageRef: externalStageRef, sizeRef: externa
       return;
     }
     const world = toWorld(sp);
+    if (it.kind === 'laser' && it.pointerId === e.pointerId) {
+      laser?.move(world);
+      return;
+    }
     if (it.kind === 'marquee' && it.pointerId === e.pointerId) {
       useBoard.getState().setMarquee(rectFrom(it.start, world));
       return;
@@ -597,6 +617,9 @@ export function BoardStage({ model, stageRef: externalStageRef, sizeRef: externa
       case 'tool':
         tool?.onPointerUp?.(toolEvent(e, world), toolCtx);
         break;
+      case 'laser':
+        laser?.up();
+        break;
       default:
         break;
     }
@@ -612,6 +635,7 @@ export function BoardStage({ model, stageRef: externalStageRef, sizeRef: externa
     }
     if (it.kind === 'marquee') useBoard.getState().setMarquee(null);
     if (it.kind === 'tool') useBoard.getState().setPreview(null);
+    if (it.kind === 'laser') laser?.up();
     interaction.current = { kind: 'idle' };
   };
 

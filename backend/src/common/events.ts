@@ -13,7 +13,7 @@ export interface AppEventMap {
   /** Изменился доступ к доске (классы, участники, мел) — пересчитать права подключённых. */
   'board.accessChanged': { boardId: string };
   /** Изменились свойства доски (название, режим, настройки). */
-  'board.updated': { boardId: string };
+  'board.updated': { boardId: string; /** Кто сменил режим (для mode.changed). */ by?: string };
   /** Доска удалена — закрыть подключения. */
   'board.deleted': { boardId: string };
 }

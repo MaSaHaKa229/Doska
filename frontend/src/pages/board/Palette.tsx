@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Search } from 'lucide-react';
-import { noWriteHint, searchScore } from '@doska/shared';
+import { searchScore } from '@doska/shared';
+import { toolUnavailable } from '../../tools/availability';
 import { registry } from '../../plugins/registry';
 import { useBoard } from '../../store/board';
 import { toolIcon } from '../../ui/icons';
@@ -53,7 +54,8 @@ export function CommandPalette({
     const toolItem = (id: string, score: number): Item | null => {
       const t = registry.getTool(id);
       if (!t) return null;
-      const disabled = t.requiresWrite && !st.caps?.write;
+      const reason = toolUnavailable(t, st.caps);
+      const disabled = !!reason;
       return {
         key: 'tool:' + t.id,
         title: t.title,
@@ -64,7 +66,7 @@ export function CommandPalette({
         score,
         run: () => {
           if (disabled) {
-            toast.info(noWriteHint(st.caps?.noWriteReason ?? 'read-only') ?? 'Нет права записи');
+            toast.info(reason!);
             return;
           }
           st.setTool(t.id);

@@ -273,6 +273,11 @@ export interface ToolModule<R = unknown> {
   keywords: string[];
   /** Инструмент изменяет документ (неактивен без права записи). */
   requiresWrite: boolean;
+  /**
+   * Дополнительное право, без которого инструмент неактивен (например,
+   * лазерная указка — право laser, которое не совпадает с правом записи).
+   */
+  requiresCapability?: 'laser' | 'moderate' | 'leadFollow';
   /** Нужно ли ядру вычислять привязки для событий. */
   snapping?: boolean;
   cursor?: string;
