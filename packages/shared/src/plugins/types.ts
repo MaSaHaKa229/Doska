@@ -187,6 +187,12 @@ export interface ObjectModule<P = Record<string, JsonValue>, R = unknown> {
     rotatable: boolean;
     resize: 'free' | 'proportional' | 'none';
   };
+  /**
+   * Растяжение рамкой меняет свойства, а не масштаб (текст переносится,
+   * буквы не растягиваются). Получает новые scaleX/scaleY после рамки и
+   * возвращает изменения объекта (обычно новые размеры в props и прежний масштаб).
+   */
+  applyResize?(obj: BoardObject<P>, scaleX: number, scaleY: number): ObjectPatch<P>;
   /** Имя редактора, открываемого двойным кликом ('formula', 'text', 'matrix'…). */
   editor?: string;
   /**

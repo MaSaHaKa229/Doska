@@ -899,3 +899,97 @@ kbd {
 .crop-handle--sw {
   cursor: nesw-resize;
 }
+
+/* ----- Текст на доске (этап 5.2b) ----- */
+.text-editor-host {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  z-index: 6;
+}
+.text-editor-host > * {
+  pointer-events: auto;
+}
+.text-editor {
+  position: absolute;
+  left: 0;
+  top: 0;
+  transform-origin: 0 0;
+  outline: 2px solid var(--accent);
+  outline-offset: 0;
+  border-radius: 2px;
+  cursor: text;
+}
+.text-editor .ProseMirror {
+  min-height: inherit;
+}
+.text-editor .ProseMirror-selectednode {
+  outline: 2px solid var(--accent);
+  border-radius: 3px;
+}
+.text-editor .selectedCell {
+  background: var(--accent-soft);
+}
+.text-toolbar {
+  position: absolute;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px;
+  max-width: min(760px, calc(100% - 8px));
+  padding: 4px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+  box-shadow: var(--shadow-2);
+  z-index: 7;
+}
+.tb-btn {
+  min-width: 30px;
+  height: 30px;
+  padding: 0 6px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 0.8rem;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.tb-btn:hover {
+  background: var(--surface-2);
+}
+.tb-btn.active {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+.tb-sep {
+  width: 1px;
+  height: 22px;
+  margin: 0 3px;
+  background: var(--border);
+}
+.tb-colors {
+  display: inline-flex;
+  gap: 2px;
+}
+.tb-colors .swatch {
+  width: 18px;
+  height: 18px;
+}
+.tb-table {
+  display: inline-flex;
+}
+.math-preview {
+  min-height: 48px;
+  padding: 10px;
+  border: 1px dashed var(--border-strong);
+  border-radius: 8px;
+  font-size: 1.4rem;
+  text-align: center;
+  overflow-x: auto;
+}

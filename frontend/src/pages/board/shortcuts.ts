@@ -117,8 +117,14 @@ export function useBoardShortcuts(commands: BoardCommands | null, ui: { palette:
       if (files.length) {
         e.preventDefault();
         void commands.insertFiles(files);
+        return;
       }
-      // Текст из буфера — этап 5.2b (текстовые блоки).
+      // Обычный текст — новым текстовым блоком.
+      const text = e.clipboardData?.getData('text/plain');
+      if (text?.trim()) {
+        e.preventDefault();
+        commands.insertText(text);
+      }
     };
 
     window.addEventListener('keydown', onKeyDown);

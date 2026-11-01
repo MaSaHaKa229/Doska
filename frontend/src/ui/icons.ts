@@ -10,6 +10,7 @@ import {
   PenLine,
   Square,
   Triangle,
+  Type,
   Zap,
   type LucideIcon,
 } from 'lucide-react';
@@ -31,6 +32,7 @@ const ICONS: Record<string, LucideIcon> = {
   PenLine,
   Square,
   Triangle,
+  Type,
   Zap,
 };
 

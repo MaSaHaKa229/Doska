@@ -87,6 +87,11 @@ export class Presence {
     this.patch({ selection: ids.slice(0, 1000) });
   }
 
+  /** Объект, который пользователь сейчас редактирует (у других — «Редактирует …»). */
+  setEditing(editing: string | null): void {
+    this.patch({ editing });
+  }
+
   setTool(tool: string | null): void {
     this.patch({ tool });
   }

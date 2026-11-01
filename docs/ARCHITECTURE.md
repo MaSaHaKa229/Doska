@@ -204,7 +204,9 @@ Nginx можно поставить на хост или в отдельный �
   - PDF на сервере не разбирается и не растеризуется: страницы рисует браузер (pdf.js) в масштабе экрана. Так текст чёткий при любом увеличении, а на сервере не нужен внешний растеризатор.
 - Поверх Nginx действуют rate limits Fastify (`@fastify/rate-limit`): вход, refresh, загрузки, WS-сообщения (токен-бакет на соединение).
 - Логи пишет pino с `redact` для `req.headers.cookie`, `authorization`, `*.password`, `*.token`, `*.passwordHash`, `set-cookie`. Пароли и токены не попадают ни в логи, ни в `AuditLog.details` (там функция `sanitizeDetails`).
-- Текст и формулы рендерятся без `innerHTML`: rich text — из JSON-дерева через React, KaTeX с `trust: false` и `maxExpand`.
+- Текст хранится деревом ProseMirror (JSON), а не HTML. Схема (`frontend/src/text/schema.ts`) отклоняет неизвестные узлы и метки, цвет и размер шрифта допускаются только из набора приложения, ссылок нет.
+  - Разметка строится сериализатором схемы, без `innerHTML` из документа. На доску блок попадает картинкой (SVG `foreignObject`): в ней браузер не выполняет скрипты и не загружает внешние ресурсы.
+  - Формулы — KaTeX с `trust: false`, `maxExpand` и `maxSize`, вывод в MathML: внешние шрифты не нужны, и в картинке формулы рисуются так же.
 - Заголовки (Nginx): `Content-Security-Policy` (без `unsafe-eval`; картинки и PDF — с того же домена, `/api/assets`), `X-Content-Type-Options`, `Referrer-Policy`, HSTS.
 
 ## 10. Масштабирование и ограничения

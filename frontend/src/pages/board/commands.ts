@@ -1,6 +1,9 @@
 import { noWriteHint, type AssetView, type Point, type SerializedBoardObject } from '@doska/shared';
 import { imageDisplaySize, uploadFile } from '../../media/insert';
 import { IMAGE_TYPE, type ImageProps } from '../../objects/image';
+import { DEFAULT_TEXT_WIDTH, TEXT_TYPE, type TextProps } from '../../objects/text';
+import { normalizeDoc, plainTextToDoc } from '../../text/schema';
+import { measureTextHeight } from '../../text/render';
 import type { BoardModel } from '../../collab/model';
 import { useBoard, currentCamera } from '../../store/board';
 import { fitRect, viewportRect, zoomAt, type Size } from '../../canvas/camera';
@@ -204,6 +207,23 @@ export class BoardCommands {
       else toast.info('Нет права добавлять объекты на эту страницу');
     }
     if (created.length) this.store.setSelection(created);
+  }
+
+  /** Обычный текст из буфера → текстовый блок в центре экрана. */
+  insertText(text: string): void {
+    const pageId = this.store.pageId;
+    if (!pageId || !text.trim()) return;
+    if (!this.store.caps?.write) {
+      toast.info(noWriteHint(this.store.caps?.noWriteReason ?? 'read-only') ?? 'Нет права записи');
+      return;
+    }
+    const cam = currentCamera();
+    const doc = normalizeDoc(plainTextToDoc(text));
+    const w = (DEFAULT_TEXT_WIDTH * 1.4) / cam.zoom;
+    const h = measureTextHeight(doc, w);
+    const id = this.model.createObject<TextProps>(TEXT_TYPE, { pageId, x: cam.cx - w / 2, y: cam.cy - Math.min(h, 400 / cam.zoom) / 2, props: { doc, w, h, fill: 'none' } });
+    if (id) this.store.setSelection([id]);
+    else toast.info('Нет права добавлять объекты на эту страницу');
   }
 
   gotoPage(delta: 1 | -1): void {

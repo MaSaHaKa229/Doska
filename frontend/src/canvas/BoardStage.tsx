@@ -15,6 +15,7 @@ import { resolveColor, SURFACE_COLORS, type CanvasTheme } from '../objects/color
 import { HAND_TOOL_ID, LASER_TOOL_ID, SELECT_TOOL_ID } from '../tools/shape-tools';
 import { toolUnavailable } from '../tools/availability';
 import { PdfBackground } from './PdfBackground';
+import { requestEditText } from '../tools/text-tool';
 import { StrokeShape } from '../objects/stroke/stroke';
 import { compactForPresence } from '../objects/stroke/geometry';
 import { PEN_TOOL_ID } from '../tools/draw-tools';
@@ -269,16 +270,18 @@ export function BoardStage({ model, stageRef: externalStageRef, sizeRef: externa
   const onTransformEnd = () => {
     const tr = transformerRef.current;
     if (!tr) return;
-    const patches = tr.nodes().map((node) => ({
-      id: node.id(),
-      patch: {
-        x: node.x(),
-        y: node.y(),
-        rotation: (node.rotation() * Math.PI) / 180,
-        scaleX: node.scaleX(),
-        scaleY: node.scaleY(),
-      },
-    }));
+    const patches = tr.nodes().map((node) => {
+      const base = { x: node.x(), y: node.y(), rotation: (node.rotation() * Math.PI) / 180 };
+      const entry = model.get(node.id());
+      // Объект сам решает, как растягиваться (текст — меняет ширину, а не масштаб).
+      if (entry?.module?.applyResize && !entry.broken) {
+        const extra = entry.module.applyResize(entry.obj, node.scaleX(), node.scaleY());
+        node.scaleX(typeof extra.scaleX === 'number' ? extra.scaleX : entry.obj.scaleX);
+        node.scaleY(typeof extra.scaleY === 'number' ? extra.scaleY : entry.obj.scaleY);
+        return { id: node.id(), patch: { ...base, ...extra } };
+      }
+      return { id: node.id(), patch: { ...base, scaleX: node.scaleX(), scaleY: node.scaleY() } };
+    });
     model.updateObjects(patches);
   };
 
@@ -728,6 +731,13 @@ export function BoardStage({ model, stageRef: externalStageRef, sizeRef: externa
         cancelInteraction();
       }}
       onContextMenu={(e) => e.preventDefault()}
+      onDoubleClick={(e) => {
+        // Двойной щелчок по тексту открывает редактор.
+        if (!pageId || toolId !== SELECT_TOOL_ID) return;
+        const world = toWorld(screenPoint(e));
+        const id = model.hitTest(pageId, world, HIT_TOLERANCE_PX / currentCamera().zoom).find((h) => model.get(h)?.module?.editor === 'text');
+        if (id) requestEditText(id);
+      }}
       onPointerLeave={() => {
         presence?.setCursor(null);
         scheduleHover(null, { x: 0, y: 0 });
@@ -792,6 +802,19 @@ export function BoardStage({ model, stageRef: externalStageRef, sizeRef: externa
               dash={[6 / camera.zoom, 4 / camera.zoom]}
             />
           ))}
+          {peers.map((p) => {
+            // «Редактирует …» над текстом, открытым другим участником.
+            const b = p.editing && model.getObject(p.editing)?.pageId === pageId ? model.boundsOf([p.editing]) : null;
+            if (!b) return null;
+            const fs = 12 / camera.zoom;
+            return (
+              <Group key={`edit-${p.clientId}`} x={b.x} y={b.y - fs * 1.8} listening={false}>
+                <KRect width={fs * (p.user.fullName.length * 0.55 + 7)} height={fs * 1.6} fill={p.user.color} cornerRadius={fs * 0.4} />
+                <Text x={fs * 0.4} y={fs * 0.3} text={`Редактирует ${p.user.fullName}`} fontSize={fs} fill="#ffffff" />
+                <KRect y={fs * 1.8} width={b.width} height={b.height} stroke={p.user.color} strokeWidth={1.5 / camera.zoom} dash={[6 / camera.zoom, 4 / camera.zoom]} />
+              </Group>
+            );
+          })}
           {peers.map((p) => {
             // Недорисованные штрихи других участников.
             const d = p.drawing;

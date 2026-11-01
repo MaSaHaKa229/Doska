@@ -66,6 +66,9 @@ interface BoardState {
 
   /** Работа по заданию (доска kind = ASSIGNMENT_WORK) или null. */
   work: BoardWorkInfo | null;
+  /** Текстовый блок, открытый в редакторе (на холсте вместо него — редактор). */
+  editingText: string | null;
+  setEditingText(id: string | null): void;
   setWork(work: BoardWorkInfo | null): void;
 
   // ----- Урок -----
@@ -145,6 +148,7 @@ const initial = () => ({
   canUndo: false,
   canRedo: false,
   work: null,
+  editingText: null,
   chalkHolders: [],
   hands: [],
   follow: null,
@@ -204,6 +208,7 @@ export const useBoard = create<BoardState>((set, get) => ({
   setSelection: (selection) => set({ selection }),
   setMarquee: (marquee) => set({ marquee }),
   setWork: (work) => set({ work }),
+  setEditingText: (editingText) => set({ editingText }),
   setToolOptions: (patch, persist = true) => {
     const toolOptions = { ...get().toolOptions, ...patch };
     if (!persist) return set({ toolOptions });

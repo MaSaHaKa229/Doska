@@ -6,6 +6,8 @@ import { handTool, laserTool, selectTool, shapeTool } from '../tools/shape-tools
 import { eraserTool, markerTool, penTool } from '../tools/draw-tools';
 import { strokeModule } from '../objects/stroke/stroke';
 import { imageModule } from '../objects/image';
+import { textModule } from '../objects/text';
+import { textTool } from '../tools/text-tool';
 import { mediaTool } from '../tools/media-tool';
 
 /**
@@ -16,8 +18,8 @@ import { mediaTool } from '../tools/media-tool';
 export const corePlugin: BoardPlugin<ReactNode> = {
   id: 'core',
   title: 'Основные',
-  objects: [shapeModule, groupModule, strokeModule, imageModule],
-  tools: [selectTool, handTool, laserTool, penTool, markerTool, eraserTool, ...(['rect', 'ellipse', 'triangle', 'line', 'arrow'] as const).map(shapeTool), mediaTool],
+  objects: [shapeModule, groupModule, strokeModule, imageModule, textModule],
+  tools: [selectTool, handTool, laserTool, penTool, markerTool, eraserTool, ...(['rect', 'ellipse', 'triangle', 'line', 'arrow'] as const).map(shapeTool), textTool, mediaTool],
 };
 
 /**

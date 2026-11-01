@@ -21,6 +21,7 @@ import { ViewMenu } from './ViewMenu';
 import { FollowBanner, HandButton, HandsIndicator, LessonMenu } from './LessonUi';
 import { LaserLayer } from './LaserLayer';
 import { WorkBar } from './WorkBar';
+import { TextEditorHost } from './TextEditor';
 import { PdfImportDialog } from './MediaUi';
 import { INSERT_FILES_EVENT, type InsertFilesDetail } from '../../media/insert';
 import { toast } from '../../store/toast';
@@ -265,6 +266,7 @@ function BoardWorkspace({ session }: { session: BoardSession }) {
           <BoardStage model={model} stageRef={stageRef} sizeRef={sizeRef} presence={session.presence} people={session.people} laser={session.laser} />
           <LaserLayer presence={session.presence} laser={session.laser} sizeRef={sizeRef} />
           <CursorsLayer presence={session.presence} sizeRef={sizeRef} />
+          <TextEditorHost model={model} presence={session.presence} sizeRef={sizeRef} theme={theme} />
           <ZoomControls commands={commands} />
         </div>
       </div>
