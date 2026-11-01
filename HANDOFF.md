@@ -15,7 +15,7 @@
 
 ## 2. Что сделано
 
-Ветка `stage-1-architecture`; последний коммит кода — этап 4.2 (хеш — в таблице ниже), затем коммит с `HANDOFF.md`. Ветка `main` указывает на коммит этапа 1 (`21e5b4a`). Открыт пулл-реквест #1 `stage-1-architecture` → `main`.
+Ветка `stage-1-architecture`; последний коммит кода — `1079aab` (этап 4.2), затем коммит с `HANDOFF.md`. Ветка `main` указывает на коммит этапа 1 (`21e5b4a`). Открыт пулл-реквест #1 `stage-1-architecture` → `main`.
 
 | Этап | Коммит | Основные файлы |
 |---|---|---|
@@ -26,7 +26,7 @@
 | 3.1. Доски, папки, сервер реального времени | 01efee1 | `backend/src/boards/`, `backend/src/realtime/{guard,room,server,persistence,connection,doc,rate-limit}.ts`, `frontend/src/pages/boards/` |
 | 3.2. Ядро холста | f268dd7 | `frontend/src/{collab,canvas,objects,tools,plugins}/`, `frontend/src/pages/board/` |
 | 3.3. Присутствие, офлайн, привязки, Ctrl+K, справка | 505e9f3 | `frontend/src/collab/{presence,people}.ts`, `frontend/src/canvas/snapping.ts`, `frontend/src/pages/board/{PresenceUi,ViewMenu,Palette,boardCommands}.tsx`, эндпоинт `GET /api/boards/:id/people` |
-| 4.2. Задания, главная ученика, миниатюры | см. `git log --grep 'Этап 4.2'` | `backend/src/assignments/`, `backend/src/boards/work-info.ts`, `backend/src/realtime/state.ts`, `?lite=1` в `realtime/{server,room}.ts`; `frontend/src/pages/assignments/`, `frontend/src/pages/board/WorkBar.tsx`, `frontend/src/canvas/BoardThumbnail.tsx`, `frontend/src/ui/Thumbs.tsx`, `e2e/assignments.cjs` |
+| 4.2. Задания, главная ученика, миниатюры | 1079aab | `backend/src/assignments/`, `backend/src/boards/work-info.ts`, `backend/src/realtime/state.ts`, `?lite=1` в `realtime/{server,room}.ts`; `frontend/src/pages/assignments/`, `frontend/src/pages/board/WorkBar.tsx`, `frontend/src/canvas/BoardThumbnail.tsx`, `frontend/src/ui/Thumbs.tsx`, `e2e/assignments.cjs` |
 | 4.1. Уроки и права учителя | 5c1abc8 | `backend/src/realtime/lesson.ts`, `room.ts`; `GET /api/directory/users`, `mode` в `PATCH /api/boards/:id`; `frontend/src/pages/board/{LessonUi,LaserLayer,useFollow}.tsx`, `frontend/src/pages/boards/AccessDialog.tsx`, `frontend/src/collab/{laser,follow}.ts`, `frontend/src/tools/availability.ts`, `e2e/` |
 
 Тесты: 76 в `packages/shared`, 99 в `backend`, 62 в `frontend`. Все проходят. Сквозные сценарии `e2e/lesson.cjs` и `e2e/assignments.cjs` прошли в браузере (см. `e2e/README.md`).
