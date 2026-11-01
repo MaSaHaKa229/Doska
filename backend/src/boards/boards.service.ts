@@ -354,6 +354,30 @@ export class BoardsService {
     this.events.emit('board.deleted', { boardId });
   }
 
+  /**
+   * Люди, связанные с доской (владелец, участники, классы с доступом,
+   * исполнитель задания) — для подписей «кто нарисовал» и списка участников.
+   * Только для тех, кто видит доску.
+   */
+  async people(user: BoardUser, boardId: string): Promise<{ id: string; fullName: string; role: UserRole }[]> {
+    const { board } = await this.requireAccess(user, boardId);
+    const work = await this.prisma.assignmentWork.findUnique({ where: { boardId }, select: { studentId: true } });
+    const users = await this.prisma.user.findMany({
+      where: {
+        OR: [
+          { id: board.ownerId },
+          ...(work ? [{ id: work.studentId }] : []),
+          { boardMemberships: { some: { boardId } } },
+          { classMemberships: { some: { class: { boardAccess: { some: { boardId } } } } } },
+        ],
+      },
+      select: { id: true, fullName: true, role: true },
+      orderBy: { fullName: 'asc' },
+      take: 2000,
+    });
+    return users;
+  }
+
   /** Классы, где пользователь — учитель (для выдачи досок). */
   async myClasses(user: BoardUser) {
     const classes = await this.prisma.class.findMany({

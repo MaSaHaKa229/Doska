@@ -23,13 +23,15 @@ export function hotkeyOf(e: KeyboardEvent): string {
  * Горячие клавиши доски. Буквы определяются по физической клавише
  * (e.code), поэтому работают и в русской раскладке.
  */
-export function useBoardShortcuts(commands: BoardCommands | null): void {
+export function useBoardShortcuts(commands: BoardCommands | null, ui: { palette: () => void; help: () => void }): void {
   useEffect(() => {
     if (!commands) return;
     const store = () => useBoard.getState();
 
     const onKeyDown = (e: KeyboardEvent) => {
-      if (isTyping(e.target)) return;
+      // Пока открыт модальный диалог, клавиши принадлежат ему (Esc закрывает
+      // диалог — его нельзя перехватывать).
+      if (isTyping(e.target) || document.querySelector('dialog[open]')) return;
       const ctrl = e.ctrlKey || e.metaKey;
       const code = e.code;
 
@@ -42,6 +44,8 @@ export function useBoardShortcuts(commands: BoardCommands | null): void {
         e.preventDefault();
         fn();
       };
+      if (ctrl && code === 'KeyK') return handled(() => ui.palette());
+      if (e.key === '?' || (e.shiftKey && code === 'Slash') || code === 'F1') return handled(() => ui.help());
       if (ctrl && code === 'KeyZ') return handled(() => (e.shiftKey ? commands.redo() : commands.undo()));
       if (ctrl && code === 'KeyY') return handled(() => commands.redo());
       if (ctrl && code === 'KeyA') return handled(() => commands.selectAll());
@@ -121,7 +125,7 @@ export function useBoardShortcuts(commands: BoardCommands | null): void {
       document.removeEventListener('cut', onCut);
       document.removeEventListener('paste', onPaste);
     };
-  }, [commands]);
+  }, [commands, ui]);
 }
 
 export { HAND_TOOL_ID };

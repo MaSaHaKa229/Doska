@@ -123,7 +123,43 @@ export const shapeModule: ObjectModule<ShapeProps, ReactNode> = {
       { kind: 'vertex' as const, point: toWorld(o, { x: p.w, y: p.h }) },
       { kind: 'vertex' as const, point: toWorld(o, { x: 0, y: p.h }) },
     ];
-    return p.kind === 'rect' ? pts : pts.slice(0, 1);
+    if (p.kind === 'rect') return pts;
+    if (p.kind === 'ellipse') {
+      return [
+        pts[0]!,
+        { kind: 'quadrant' as const, point: toWorld(o, { x: p.w / 2, y: 0 }) },
+        { kind: 'quadrant' as const, point: toWorld(o, { x: p.w, y: p.h / 2 }) },
+        { kind: 'quadrant' as const, point: toWorld(o, { x: p.w / 2, y: p.h }) },
+        { kind: 'quadrant' as const, point: toWorld(o, { x: 0, y: p.h / 2 }) },
+      ];
+    }
+    return [
+      pts[0]!,
+      { kind: 'vertex' as const, point: toWorld(o, { x: p.w / 2, y: 0 }) },
+      { kind: 'vertex' as const, point: toWorld(o, { x: p.w, y: p.h }) },
+      { kind: 'vertex' as const, point: toWorld(o, { x: 0, y: p.h }) },
+    ];
+  },
+  getSnapCurves: (o) => {
+    const p = o.props;
+    const w = (x: number, y: number) => toWorld(o, { x, y });
+    switch (p.kind) {
+      case 'line':
+      case 'arrow':
+        return [{ kind: 'segment', a: w(0, 0), b: w(p.w, p.h) }];
+      case 'rect':
+        return [{ kind: 'polyline', points: [w(0, 0), w(p.w, 0), w(p.w, p.h), w(0, p.h)], closed: true }];
+      case 'triangle':
+        return [{ kind: 'polyline', points: [w(p.w / 2, 0), w(p.w, p.h), w(0, p.h)], closed: true }];
+      case 'ellipse': {
+        // Эллипс (в т. ч. после поворота и масштаба) — ломаная из 64 звеньев.
+        const pts = Array.from({ length: 64 }, (_, i) => {
+          const a = (i / 64) * Math.PI * 2;
+          return w(p.w / 2 + (p.w / 2) * Math.cos(a), p.h / 2 + (p.h / 2) * Math.sin(a));
+        });
+        return [{ kind: 'polyline', points: pts, closed: true }];
+      }
+    }
   },
   render: (o, ctx) => {
     const p = o.props;

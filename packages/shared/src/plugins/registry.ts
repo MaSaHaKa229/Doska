@@ -38,6 +38,32 @@ function isInNamespace(name: string, pluginId: string): boolean {
   return name.startsWith(pluginId + '.');
 }
 
+/**
+ * Оценка совпадения запроса с названием и ключевыми словами (0 — не подходит):
+ * точное совпадение названия 100, начало названия 80, начало слова названия 70,
+ * начало ключевого слова 60, подстрока названия 40, подстрока ключевого слова 30.
+ * Все слова запроса должны найтись (берётся минимальная оценка по словам).
+ */
+export function searchScore(query: string, title: string, keywords: readonly string[]): number {
+  const q = normalizeSearchText(query);
+  if (!q) return 0;
+  const words = q.split(' ');
+  const t = normalizeSearchText(title);
+  const kws = keywords.map(normalizeSearchText);
+  let total = Infinity;
+  for (const w of words) {
+    let s = 0;
+    if (t === q) s = 100;
+    else if (t.startsWith(w)) s = 80;
+    else if (t.split(/[\s\-—–«»(),]+/).some((tw) => tw.startsWith(w))) s = 70;
+    else if (kws.some((k) => k.startsWith(w) || k.split(' ').some((kw) => kw.startsWith(w)))) s = 60;
+    else if (t.includes(w)) s = 40;
+    else if (kws.some((k) => k.includes(w))) s = 30;
+    total = Math.min(total, s);
+  }
+  return total === Infinity ? 0 : total;
+}
+
 export class PluginRegistry<R = unknown> {
   private readonly plugins = new Map<string, BoardPlugin<R>>();
   private readonly objects = new Map<string, ObjectModule<any, R>>();
@@ -115,6 +141,10 @@ export class PluginRegistry<R = unknown> {
     return this.tools.get(id);
   }
 
+  getCommand(id: string): CommandDescriptor | undefined {
+    return this.commands.get(id);
+  }
+
   getToolByHotkey(hotkey: string): ToolModule<R> | undefined {
     const id = this.hotkeys.get(hotkey.toLowerCase());
     return id ? this.tools.get(id) : undefined;
@@ -146,25 +176,9 @@ export class PluginRegistry<R = unknown> {
   search(query: string, limit = 20): SearchResult[] {
     const q = normalizeSearchText(query);
     if (!q) return [];
-    const words = q.split(' ');
     const results: SearchResult[] = [];
 
-    const scoreOf = (title: string, keywords: string[]): number => {
-      const t = normalizeSearchText(title);
-      const kws = keywords.map(normalizeSearchText);
-      let total = Infinity;
-      for (const w of words) {
-        let s = 0;
-        if (t === q) s = 100;
-        else if (t.startsWith(w)) s = 80;
-        else if (t.split(/[\s\-—–«»(),]+/).some((tw) => tw.startsWith(w))) s = 70;
-        else if (kws.some((k) => k.startsWith(w) || k.split(' ').some((kw) => kw.startsWith(w)))) s = 60;
-        else if (t.includes(w)) s = 40;
-        else if (kws.some((k) => k.includes(w))) s = 30;
-        total = Math.min(total, s);
-      }
-      return total === Infinity ? 0 : total;
-    };
+    const scoreOf = (title: string, keywords: string[]) => searchScore(q, title, keywords);
 
     for (const t of this.tools.values()) {
       const score = scoreOf(t.title, t.keywords);

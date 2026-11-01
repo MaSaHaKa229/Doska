@@ -4,6 +4,7 @@ import { useBoard, currentCamera } from '../../store/board';
 import { fitRect, viewportRect, zoomAt, type Size } from '../../canvas/camera';
 import { toast } from '../../store/toast';
 import { pluralize } from '../../lib/format';
+import { registry } from '../../plugins/registry';
 
 /** Шаги масштаба кнопок «+»/«−» (проценты). */
 export const ZOOM_STEPS = [0.05, 0.1, 0.25, 0.5, 0.75, 1, 1.25, 1.5, 2, 3, 4, 6, 8, 12, 16, 24, 32, 50];
@@ -139,6 +140,22 @@ export class BoardCommands {
       return;
     }
     this.store.setCamera(fitRect(rect, this.size()));
+  }
+
+  /** Вставить объект плагина в центр экрана (палитра Ctrl+K). */
+  insertAtCenter(objectType: string, props: Record<string, unknown>): void {
+    const pageId = this.store.pageId;
+    if (!pageId) return;
+    const module = registry.getObjectModule(objectType);
+    if (!module) {
+      toast.error('Этот тип объекта недоступен');
+      return;
+    }
+    const cam = currentCamera();
+    const full = { ...(module.createProps() as Record<string, unknown>), ...props };
+    const id = this.model.createObject(objectType, { pageId, x: cam.cx, y: cam.cy, props: full });
+    if (id) this.store.setSelection([id]);
+    else toast.info('Нет права добавлять объекты на эту страницу');
   }
 
   gotoPage(delta: 1 | -1): void {

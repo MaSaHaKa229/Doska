@@ -20,6 +20,7 @@ const idParams = z.object({ id: z.string().uuid('Неверный идентиф
  *   GET    /api/boards                 список (scope own/shared/all, папка, поиск, сортировка)
  *   POST   /api/boards                 создать (учитель — урок, ученик — конспект)
  *   GET    /api/boards/:id             свойства, мои права, доступ (для учителя)
+ *   GET    /api/boards/:id/people      люди доски (подписи авторов)
  *   PATCH  /api/boards/:id             название, описание, папка, настройки
  *   PUT    /api/boards/:id/access      классы и участники (полная замена)
  *   DELETE /api/boards/:id             удалить (владелец)
@@ -50,6 +51,10 @@ export async function boardsRoutes(app: FastifyInstance): Promise<void> {
 
   app.get('/boards/:id', { config: limit(600) }, async (req) => ({
     board: await boards.get(user(req), parseInput(idParams, req.params).id),
+  }));
+
+  app.get('/boards/:id/people', { config: limit(300) }, async (req) => ({
+    people: await boards.people(user(req), parseInput(idParams, req.params).id),
   }));
 
   app.patch('/boards/:id', { config: limit(240) }, async (req) => ({

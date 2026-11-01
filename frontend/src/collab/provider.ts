@@ -22,6 +22,8 @@ export interface ProviderEvents {
   status(status: ProviderStatus, reason: string | null, code: number | null): void;
   control(msg: ServerControlMessage): void;
   synced(): void;
+  /** Свои изменения, накопленные без связи, отправлены серверу (ответ на его step1). */
+  flushed(): void;
 }
 
 /** Сообщения пользователю по кодам закрытия, после которых переподключения нет. */
@@ -67,6 +69,7 @@ export class BoardProvider {
     status: new Set(),
     control: new Set(),
     synced: new Set(),
+    flushed: new Set(),
   };
 
   constructor(
@@ -134,6 +137,7 @@ export class BoardProvider {
       encoding.writeVarUint(enc, MessageType.Sync);
       const syncType = syncProtocol.readSyncMessage(decoder, enc, this.doc, this);
       if (encoding.length(enc) > 1) this.send(encoding.toUint8Array(enc));
+      if (syncType === syncProtocol.messageYjsSyncStep1) this.listeners.flushed.forEach((l) => l());
       if (syncType === syncProtocol.messageYjsSyncStep2 && !this.synced) {
         this.synced = true;
         this.listeners.synced.forEach((l) => l());
@@ -187,7 +191,11 @@ export class BoardProvider {
   };
 
   private onOffline = () => {
-    if (this.status !== 'closed') this.emitStatus('offline');
+    if (this.status === 'closed') return;
+    this.emitStatus('offline');
+    // Закрываем сокет явно: после восстановления сети переподключение
+    // выполнит полную синхронизацию (step1/step2) и отправит накопленное.
+    this.ws?.close(1000, 'Нет сети');
   };
 
   private startPing(): void {

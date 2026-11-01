@@ -148,6 +148,13 @@ describe('доски', () => {
     expect((await student.request('GET', '/api/boards')).json().total).toBe(0);
   });
 
+  it('люди доски: только связанные и только тем, кто видит доску', async () => {
+    const b = await createBoard(teacher, { title: 'Люди', classIds: [ids.cls] });
+    const people = (await student.request('GET', `/api/boards/${b.id}/people`)).json().people;
+    expect(people.map((p: { fullName: string }) => p.fullName).sort()).toEqual(['Ученик Класса', 'Учитель Один']);
+    expect((await outsider.request('GET', `/api/boards/${b.id}/people`)).statusCode).toBe(404);
+  });
+
   it('мои классы', async () => {
     const res = (await teacher.request('GET', '/api/boards/my-classes')).json();
     expect(res.classes).toEqual([{ id: ids.cls, name: '9А', academicYear: null, studentCount: 1 }]);

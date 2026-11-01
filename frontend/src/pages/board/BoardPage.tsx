@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore, useCallback } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { ArrowLeft, CloudOff, Loader2, Lock, Redo2, Undo2, Wifi } from 'lucide-react';
+import { ArrowLeft, CloudOff, Loader2, Lock, Redo2, Search, Undo2, Wifi } from 'lucide-react';
 import { BOARD_MODE_LABELS, noWriteHint, type BoardDetails } from '@doska/shared';
 import type Konva from 'konva';
 import { boardsApi } from '../../api/boards';
-import { errorMessage } from '../../api/http';
+import { ApiError, errorMessage } from '../../api/http';
 import { useAuth } from '../../store/auth';
 import { useBoard, type ConnectionStatus } from '../../store/board';
 import { openBoardSession, type BoardSession } from '../../collab/session';
@@ -16,6 +16,30 @@ import { BoardCommands } from './commands';
 import { useBoardShortcuts } from './shortcuts';
 import { PageTabs, PropertiesBar, Toolbar, ZoomControls } from './Panels';
 import type { CanvasTheme } from '../../objects/colors';
+import { CursorsLayer, Participants } from './PresenceUi';
+import { ViewMenu } from './ViewMenu';
+import { CommandPalette, HelpDialog } from './Palette';
+import { coreCommands } from './boardCommands';
+import { pluralize } from '../../lib/format';
+
+const DETAILS_CACHE = 'doska.boardCache.';
+
+/** Свойства доски для открытия без сети (без списка доступа). */
+function cacheDetails(d: BoardDetails): void {
+  try {
+    localStorage.setItem(DETAILS_CACHE + d.id, JSON.stringify({ ...d, access: null }));
+  } catch {
+    /* хранилище недоступно */
+  }
+}
+function cachedDetails(id: string): BoardDetails | null {
+  try {
+    const raw = localStorage.getItem(DETAILS_CACHE + id);
+    return raw ? (JSON.parse(raw) as BoardDetails) : null;
+  } catch {
+    return null;
+  }
+}
 
 const STATUS: Record<ConnectionStatus, { label: string; kind?: 'accent' | 'warning' | 'danger' }> = {
   connecting: { label: 'Подключение…', kind: 'warning' },
@@ -45,11 +69,22 @@ export function BoardPage() {
       .get(id)
       .then(({ board }) => {
         if (cancelled) return;
+        cacheDetails(board);
         setDetails(board);
         s = openBoardSession(board, user);
         setSession(s);
       })
-      .catch((err) => !cancelled && setError(errorMessage(err)));
+      .catch((err) => {
+        if (cancelled) return;
+        // Нет сети — открываем доску по сохранённым свойствам: работа
+        // продолжится локально и синхронизируется после подключения.
+        const cached = err instanceof ApiError && err.code === 'NETWORK' ? cachedDetails(id) : null;
+        if (cached) {
+          setDetails(cached);
+          s = openBoardSession(cached, user);
+          setSession(s);
+        } else setError(errorMessage(err));
+      });
     return () => {
       cancelled = true;
       s?.destroy();
@@ -88,7 +123,12 @@ function BoardWorkspace({ session }: { session: BoardSession }) {
   const stageRef = useRef<Konva.Stage | null>(null);
   const sizeRef = useRef<Size>({ width: 800, height: 600 });
   const commands = useMemo(() => new BoardCommands(model, () => sizeRef.current), [model]);
-  useBoardShortcuts(commands);
+  const [paletteOpen, setPaletteOpen] = useState(false);
+  const [helpOpen, setHelpOpen] = useState(false);
+  const ui = useMemo(() => ({ palette: () => setPaletteOpen(true), help: () => setHelpOpen(true) }), []);
+  const paletteCommands = useMemo(() => coreCommands(commands, model, { help: ui.help }), [commands, model, ui]);
+  const pendingChanges = useBoard((s) => s.pendingChanges);
+  useBoardShortcuts(commands, ui);
 
   // Отладочный доступ для сквозных тестов (только в режиме разработки).
   useEffect(() => {
@@ -127,10 +167,23 @@ function BoardWorkspace({ session }: { session: BoardSession }) {
         </h1>
         {board?.kind === 'LESSON' && <Badge kind="accent">{BOARD_MODE_LABELS[board.mode]}</Badge>}
         <span className="spacer" />
-        <Badge kind={st.kind} title={closedReason ?? undefined}>
+        <Participants presence={session.presence} model={model} />
+        <Badge
+          kind={st.kind}
+          title={
+            closedReason ??
+            (status !== 'online' ? 'Изменения сохраняются на этом устройстве и отправятся после подключения' : 'Изменения сохраняются автоматически')
+          }
+        >
           {status === 'online' ? <Wifi size={12} /> : status === 'offline' || status === 'closed' ? <CloudOff size={12} /> : <Loader2 size={12} className="spin" />}
-          <span data-testid="connection-status">{st.label}</span>
+          <span data-testid="connection-status">
+            {st.label}
+            {status !== 'online' && pendingChanges > 0 &&
+              ` · ${pendingChanges} ${pluralize(pendingChanges, 'изменение ждёт', 'изменения ждут', 'изменений ждут')} отправки`}
+          </span>
         </Badge>
+        <Button size="small" variant="ghost" iconOnly icon={<Search size={18} />} aria-label="Поиск инструментов и команд (Ctrl+K)" title="Поиск инструментов и команд (Ctrl+K)" onClick={ui.palette} />
+        <ViewMenu model={model} onHelp={ui.help} />
         <Button size="small" variant="ghost" iconOnly icon={<Undo2 size={18} />} aria-label="Отменить (Ctrl+Z)" title="Отменить (Ctrl+Z)" disabled={!canUndo} onClick={() => commands.undo()} />
         <Button size="small" variant="ghost" iconOnly icon={<Redo2 size={18} />} aria-label="Повторить (Ctrl+Shift+Z)" title="Повторить (Ctrl+Shift+Z)" disabled={!canRedo} onClick={() => commands.redo()} />
       </header>
@@ -155,11 +208,19 @@ function BoardWorkspace({ session }: { session: BoardSession }) {
               <Loader2 size={20} className="spin" /> Загрузка доски…
             </div>
           )}
-          <BoardStage model={model} stageRef={stageRef} sizeRef={sizeRef} />
+          <BoardStage model={model} stageRef={stageRef} sizeRef={sizeRef} presence={session.presence} people={session.people} />
+          <CursorsLayer presence={session.presence} sizeRef={sizeRef} />
           <ZoomControls commands={commands} />
         </div>
       </div>
       <PageTabs model={model} />
+      <CommandPalette
+        open={paletteOpen}
+        onClose={() => setPaletteOpen(false)}
+        commands={paletteCommands}
+        onInsert={(type, props) => commands.insertAtCenter(type, props)}
+      />
+      <HelpDialog open={helpOpen} onClose={() => setHelpOpen(false)} commands={paletteCommands} />
     </div>
   );
 }

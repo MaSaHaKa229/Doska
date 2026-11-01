@@ -52,6 +52,8 @@ export const useAuth = create<AuthState>((set, get) => ({
       if (allDevices) await authApi.logoutAll();
       else await authApi.logout();
     } finally {
+      // Локальные копии досок удаляются вместе с выходом.
+      await import('../collab/session').then((m) => m.clearLocalBoards()).catch(() => undefined);
       set({ status: 'anonymous', user: null, notice: null });
     }
   },

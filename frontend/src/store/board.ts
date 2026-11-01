@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import type { BoardCapabilities, BoardKind, BoardMode, BoardSettings, Rect } from '@doska/shared';
 import { DEFAULT_CAMERA, type Camera } from '../canvas/camera';
 import type { ShapeKind } from '../objects/shape';
+import type { SnapResult } from '../canvas/snapping';
 
 export type ConnectionStatus = 'connecting' | 'online' | 'reconnecting' | 'offline' | 'closed';
 
@@ -29,6 +30,8 @@ interface BoardState {
   /** Причина закрытия без переподключения (нет доступа, доска удалена…). */
   closedReason: string | null;
   synced: boolean;
+  /** Свои изменения, сделанные без связи и ещё не отправленные серверу. */
+  pendingChanges: number;
 
   pageId: string | null;
   cameras: Record<string, Camera>;
@@ -40,6 +43,8 @@ interface BoardState {
   marquee: Rect | null;
   toolOptions: ToolOptions;
   preview: unknown;
+  /** Текущая привязка (маркер с подписью у курсора). */
+  snapHint: SnapResult | null;
   canUndo: boolean;
   canRedo: boolean;
 
@@ -47,6 +52,7 @@ interface BoardState {
   setCaps(caps: BoardCapabilities): void;
   setStatus(status: ConnectionStatus, closedReason?: string | null): void;
   setSynced(v: boolean): void;
+  setPendingChanges(n: number): void;
   setPage(pageId: string): void;
   setCamera(cam: Camera): void;
   setTool(toolId: string): void;
@@ -55,6 +61,7 @@ interface BoardState {
   setMarquee(r: Rect | null): void;
   setToolOptions(patch: Partial<ToolOptions>): void;
   setPreview(p: unknown): void;
+  setSnapHint(s: SnapResult | null): void;
   setHistory(canUndo: boolean, canRedo: boolean): void;
   reset(): void;
 }
@@ -77,6 +84,7 @@ const initial = () => ({
   status: 'connecting' as ConnectionStatus,
   closedReason: null,
   synced: false,
+  pendingChanges: 0,
   pageId: null,
   cameras: {},
   toolId: 'core.select',
@@ -85,6 +93,7 @@ const initial = () => ({
   marquee: null,
   toolOptions: loadToolOptions(),
   preview: null,
+  snapHint: null,
   canUndo: false,
   canRedo: false,
 });
@@ -96,6 +105,7 @@ export const useBoard = create<BoardState>((set, get) => ({
   setCaps: (caps) => set({ caps }),
   setStatus: (status, closedReason = null) => set({ status, closedReason }),
   setSynced: (synced) => set({ synced }),
+  setPendingChanges: (pendingChanges) => set({ pendingChanges }),
   setPage: (pageId) => set({ pageId, selection: [], marquee: null }),
   setCamera: (cam) => {
     const pageId = get().pageId;
@@ -115,6 +125,11 @@ export const useBoard = create<BoardState>((set, get) => ({
     set({ toolOptions });
   },
   setPreview: (preview) => set({ preview }),
+  setSnapHint: (snapHint) => {
+    const cur = get().snapHint;
+    if (cur === snapHint || (cur && snapHint && cur.kind === snapHint.kind && cur.point.x === snapHint.point.x && cur.point.y === snapHint.point.y)) return;
+    set({ snapHint });
+  },
   setHistory: (canUndo, canRedo) => set({ canUndo, canRedo }),
   reset: () => set(initial()),
 }));

@@ -226,6 +226,30 @@ export class BoardModel {
     return out;
   }
 
+  /**
+   * Источники привязки рядом с точкой: характерные точки и кривые объектов
+   * в квадрате ±radius (кроме exclude — например, перетаскиваемых объектов).
+   */
+  snapSources(pageId: string, point: { x: number; y: number }, radius: number, exclude: ReadonlySet<string> = new Set()) {
+    const ids = this.queryRect(pageId, { x: point.x - radius, y: point.y - radius, width: radius * 2, height: radius * 2 });
+    const out: { id: string; points: ReturnType<NonNullable<ObjectModule['getSnapPoints']>>; curves: ReturnType<NonNullable<ObjectModule['getSnapCurves']>> }[] = [];
+    for (const id of ids.slice(-40)) {
+      if (exclude.has(id)) continue;
+      const e = this.entries.get(id);
+      if (!e?.module || e.broken || e.obj.hidden) continue;
+      try {
+        out.push({
+          id,
+          points: e.module.getSnapPoints?.(e.obj, this.resolve) ?? [],
+          curves: e.module.getSnapCurves?.(e.obj, this.resolve) ?? [],
+        });
+      } catch {
+        /* ошибка модуля не должна ломать привязки */
+      }
+    }
+    return out;
+  }
+
   /** Верхний предок по цепочке групп (что выделяется кликом). */
   rootOf(id: string): string {
     let cur = id;

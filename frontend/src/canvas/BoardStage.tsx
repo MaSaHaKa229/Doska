@@ -3,11 +3,14 @@ import Konva from 'konva';
 import { Circle, Group, Layer, Rect as KRect, Shape, Stage, Text, Transformer } from 'react-konva';
 import type { BoardObject, Point, Rect, RenderContext, ToolContext, ToolPointerEvent } from '@doska/shared';
 import type { BoardModel } from '../collab/model';
+import { cursorVisible, type Presence } from '../collab/presence';
+import type { PeopleDirectory } from '../collab/people';
 import { useBoard, currentCamera, type ToolOptions } from '../store/board';
 import { useAuth } from '../store/auth';
 import { registry } from '../plugins/registry';
 import { DEFAULT_CAMERA, panBy, screenToWorld, viewportRect, wheelIntent, wheelZoomFactor, zoomAt, type Camera, type Size } from './camera';
 import { drawBackground, type Ctx2D } from './background';
+import { findSnap, gridSnap, SNAP_LABELS, type SnapResult } from './snapping';
 import { resolveColor, SURFACE_COLORS, type CanvasTheme } from '../objects/colors';
 import { HAND_TOOL_ID, SELECT_TOOL_ID } from '../tools/shape-tools';
 import { noWriteHint } from '@doska/shared';
@@ -17,6 +20,8 @@ import { toast } from '../store/toast';
 const HIT_TOLERANCE_PX = 6;
 /** Порог, после которого нажатие считается перетаскиванием, экранные пиксели. */
 const DRAG_THRESHOLD_PX = 3;
+/** Радиус привязки, экранные пиксели. */
+const SNAP_TOLERANCE_PX = 10;
 /** Запас видимой области для виртуализации (доля размера экрана). */
 const VIEWPORT_MARGIN = 0.2;
 
@@ -129,6 +134,8 @@ type Interaction =
       pointerId: number;
       clickRoot: string;
       wasSelected: boolean;
+      /** Характерные точки перемещаемых объектов (для привязки при перемещении). */
+      snapPoints: Point[];
     }
   | { kind: 'handle'; objectId: string; handleId: string; pointerId: number }
   | { kind: 'tool'; pointerId: number };
@@ -140,9 +147,22 @@ export interface BoardStageProps {
   /** Ссылка на Stage (экспорт, «показать всё»). */
   stageRef?: React.MutableRefObject<Konva.Stage | null>;
   sizeRef?: React.MutableRefObject<Size>;
+  /** Присутствие (курсоры, выделения других) — нет в автономных тестах холста. */
+  presence?: Presence;
+  people?: PeopleDirectory;
 }
 
-export function BoardStage({ model, stageRef: externalStageRef, sizeRef: externalSizeRef }: BoardStageProps) {
+const NO_PEERS: never[] = [];
+const HOVER_DELAY_MS = 600;
+
+function formatTime(ms: number): string {
+  const d = new Date(ms);
+  const today = new Date();
+  const sameDay = d.toDateString() === today.toDateString();
+  return d.toLocaleString('ru-RU', sameDay ? { hour: '2-digit', minute: '2-digit' } : { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+}
+
+export function BoardStage({ model, stageRef: externalStageRef, sizeRef: externalSizeRef, presence, people }: BoardStageProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const stageRef = useRef<Konva.Stage | null>(null);
   const transformerRef = useRef<Konva.Transformer | null>(null);
@@ -159,8 +179,18 @@ export function BoardStage({ model, stageRef: externalStageRef, sizeRef: externa
   const selection = useBoard((s) => s.selection);
   const marquee = useBoard((s) => s.marquee);
   const preview = useBoard((s) => s.preview);
+  const snapHint = useBoard((s) => s.snapHint);
   const caps = useBoard((s) => s.caps);
   const penOnly = useAuth((s) => s.user?.preferences.penOnly ?? false);
+  const settings = useBoard((s) => s.board?.settings);
+  const peers = useSyncExternalStore(
+    useCallback((cb) => (presence ? presence.subscribe(cb) : () => undefined), [presence]),
+    () => (presence ? presence.peers() : NO_PEERS),
+  );
+  useSyncExternalStore(
+    useCallback((cb) => (people ? people.subscribe(cb) : () => undefined), [people]),
+    () => people,
+  );
 
   useSyncExternalStore(useCallback((cb) => model.subscribePages(cb), [model]), () => model.pagesStamp);
   const page = pageId ? model.page(pageId) : undefined;
@@ -182,6 +212,13 @@ export function BoardStage({ model, stageRef: externalStageRef, sizeRef: externa
     setSize({ width: el.clientWidth, height: el.clientHeight });
     return () => ro.disconnect();
   }, []);
+
+  // Своё присутствие: вид, выделение, инструмент.
+  useEffect(() => {
+    if (presence && pageId) presence.setViewport({ pageId, centerX: camera.cx, centerY: camera.cy, zoom: camera.zoom });
+  }, [presence, pageId, camera.cx, camera.cy, camera.zoom]);
+  useEffect(() => presence?.setSelection(selection), [presence, selection]);
+  useEffect(() => presence?.setTool(toolId), [presence, toolId]);
 
   // Виртуализация: только объекты, пересекающие видимую область с запасом.
   const view = viewportRect(camera, size);
@@ -284,10 +321,28 @@ export function BoardStage({ model, stageRef: externalStageRef, sizeRef: externa
   const toWorld = (p: Point) => screenToWorld(currentCamera(), sizeRef.current, p);
   const setCamera = (cam: Camera) => useBoard.getState().setCamera(cam);
 
-  const toolEvent = (e: React.PointerEvent, world: Point): ToolPointerEvent => ({
+  /** Привязка точки к объектам и сетке (Alt — без привязки). */
+  const snapPoint = (world: Point, alt: boolean, exclude: ReadonlySet<string> = new Set()): SnapResult | null => {
+    const prefs = useAuth.getState().user?.preferences;
+    if (alt || !pageId || !prefs) return null;
+    const zoom = currentCamera().zoom;
+    const tol = SNAP_TOLERANCE_PX / zoom;
+    const sources = prefs.snapToObjects ? model.snapSources(pageId, world, tol * 3, exclude) : [];
+    const pg = model.page(pageId);
+    const grid = prefs.snapToGrid && pg ? gridSnap(world, pg.background, zoom) : null;
+    return findSnap(world, tol, sources, grid);
+  };
+
+  const toolEvent = (e: React.PointerEvent, world: Point): ToolPointerEvent => {
+    const snap = tool?.snapping ? snapPoint(world, e.altKey) : null;
+    useBoard.getState().setSnapHint(snap && snap.kind !== 'grid' ? snap : null);
+    return toolEventWith(e, world, snap);
+  };
+
+  const toolEventWith = (e: React.PointerEvent, world: Point, snap: SnapResult | null): ToolPointerEvent => ({
     world,
-    snapped: world, // привязки к сетке и объектам — этап 3.3
-    snap: null,
+    snapped: snap?.point ?? world,
+    snap: snap && snap.kind !== 'grid' ? { kind: snap.kind, point: snap.point, refId: snap.refId } : null,
     pressure: e.pointerType === 'mouse' ? 0.5 : e.pressure || 0.5,
     pointerType: e.pointerType === 'pen' ? 'pen' : e.pointerType === 'touch' ? 'touch' : 'mouse',
     modifiers: { shift: e.shiftKey, alt: e.altKey, ctrl: e.ctrlKey || e.metaKey },
@@ -306,7 +361,25 @@ export function BoardStage({ model, stageRef: externalStageRef, sizeRef: externa
     return null;
   };
 
+  // ----- Подпись автора при наведении -----
+  const [hover, setHover] = useState<{ id: string; x: number; y: number } | null>(null);
+  const hoverTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const hoverId = useRef<string | null>(null);
+  const showAuthors = caps?.moderate || settings?.showAuthorsToStudents !== false;
+  const scheduleHover = (id: string | null, at: Point) => {
+    if (id === hoverId.current) return;
+    hoverId.current = id;
+    if (hoverTimer.current) clearTimeout(hoverTimer.current);
+    setHover(null);
+    if (!id || !showAuthors) return;
+    hoverTimer.current = setTimeout(() => setHover({ id, x: at.x, y: at.y }), HOVER_DELAY_MS);
+  };
+  useEffect(() => () => {
+    if (hoverTimer.current) clearTimeout(hoverTimer.current);
+  }, []);
+
   const onPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    scheduleHover(null, { x: 0, y: 0 });
     if (!pageId) return;
     const sp = screenPoint(e);
     pointers.current.set(e.pointerId, sp);
@@ -363,6 +436,12 @@ export function BoardStage({ model, stageRef: externalStageRef, sizeRef: externa
             pointerId: e.pointerId,
             clickRoot: root,
             wasSelected,
+            snapPoints: moveLeaves
+              .flatMap((id) => {
+                const en = model.get(id);
+                return en?.module?.getSnapPoints?.(en.obj, model.resolve).map((p) => p.point) ?? [];
+              })
+              .slice(0, 12),
           };
         }
       } else {
@@ -387,6 +466,10 @@ export function BoardStage({ model, stageRef: externalStageRef, sizeRef: externa
 
   const onPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
     const sp = screenPoint(e);
+    if (presence && pageId) {
+      const w = toWorld(sp);
+      presence.setCursor({ pageId, x: w.x, y: w.y });
+    }
     if (pointers.current.has(e.pointerId)) pointers.current.set(e.pointerId, sp);
     const it = interaction.current;
 
@@ -415,8 +498,7 @@ export function BoardStage({ model, stageRef: externalStageRef, sizeRef: externa
       it.moved = true;
       // Во время перетаскивания узлы двигаются напрямую (без записи в документ
       // на каждом кадре); в документ — одна транзакция при отпускании.
-      const dx = world.x - it.startWorld.x;
-      const dy = world.y - it.startWorld.y;
+      const { dx, dy } = snappedDelta(it, world, e.altKey);
       for (const id of it.leaves) {
         const node = nodes.current.get(id);
         const o = it.origin.get(id)!;
@@ -428,7 +510,10 @@ export function BoardStage({ model, stageRef: externalStageRef, sizeRef: externa
     }
     if (it.kind === 'handle' && it.pointerId === e.pointerId) {
       const entry = model.get(it.objectId);
-      const patch = entry?.module?.dragHandle?.(entry.obj, it.handleId, world, { shift: e.shiftKey, alt: e.altKey, ctrl: e.ctrlKey }, model.resolve);
+      const snap = snapPoint(world, e.altKey, new Set([it.objectId]));
+      useBoard.getState().setSnapHint(snap && snap.kind !== 'grid' ? snap : null);
+      const target = snap?.point ?? world;
+      const patch = entry?.module?.dragHandle?.(entry.obj, it.handleId, target, { shift: e.shiftKey, alt: e.altKey, ctrl: e.ctrlKey }, model.resolve);
       // Ручки двигаются редко и коротко: пишем сразу, шаги склеиваются в один шаг отмены.
       if (patch) model.updateObjects([{ id: it.objectId, patch }], { merge: true });
       return;
@@ -437,14 +522,39 @@ export function BoardStage({ model, stageRef: externalStageRef, sizeRef: externa
       tool?.onPointerMove?.(toolEvent(e, world), toolCtx);
       return;
     }
-    if (it.kind === 'idle' && e.pointerType === 'mouse' && pageId && toolId === SELECT_TOOL_ID) {
-      const over = handleAt(world)
-        ? 'pointer'
-        : model.hitTest(pageId, world, HIT_TOLERANCE_PX / currentCamera().zoom).length
-          ? 'move'
-          : null;
-      if (over !== hoverCursor) setHoverCursor(over);
+    if (it.kind === 'idle' && e.pointerType === 'mouse' && pageId) {
+      const hits = model.hitTest(pageId, world, HIT_TOLERANCE_PX / currentCamera().zoom);
+      if (toolId === SELECT_TOOL_ID) {
+        const over = handleAt(world) ? 'pointer' : hits.length ? 'move' : null;
+        if (over !== hoverCursor) setHoverCursor(over);
+      }
+      scheduleHover(hits[0] ?? null, sp);
     }
+  };
+
+  /**
+   * Сдвиг при перемещении с привязкой: из характерных точек перемещаемых
+   * объектов выбирается та, что ближе всего «прилипает» к точке других
+   * объектов или к сетке, и сдвиг корректируется на эту разницу.
+   */
+  const snappedDelta = (it: Extract<Interaction, { kind: 'move' }>, world: Point, alt: boolean) => {
+    let dx = world.x - it.startWorld.x;
+    let dy = world.y - it.startWorld.y;
+    let best: { d: number; cx: number; cy: number; snap: SnapResult } | null = null;
+    const exclude = new Set(it.leaves);
+    for (const p of it.snapPoints) {
+      const moved = { x: p.x + dx, y: p.y + dy };
+      const snap = snapPoint(moved, alt, exclude);
+      if (!snap) continue;
+      const d = Math.hypot(snap.point.x - moved.x, snap.point.y - moved.y);
+      if (!best || d < best.d) best = { d, cx: snap.point.x - moved.x, cy: snap.point.y - moved.y, snap };
+    }
+    if (best) {
+      dx += best.cx;
+      dy += best.cy;
+    }
+    useBoard.getState().setSnapHint(best && best.snap.kind !== 'grid' ? best.snap : null);
+    return { dx, dy };
   };
 
   const finish = (e: React.PointerEvent<HTMLDivElement>) => {
@@ -477,8 +587,7 @@ export function BoardStage({ model, stageRef: externalStageRef, sizeRef: externa
       }
       case 'move':
         if (it.moved) {
-          const dx = world.x - it.startWorld.x;
-          const dy = world.y - it.startWorld.y;
+          const { dx, dy } = snappedDelta(it, world, e.altKey);
           model.updateObjects(it.leaves.map((id) => ({ id, patch: { x: it.origin.get(id)!.x + dx, y: it.origin.get(id)!.y + dy } })));
         } else if (it.wasSelected && !e.shiftKey && store.selection.length > 1) {
           // Щелчок по уже выделенному без перетаскивания — оставить только его.
@@ -491,6 +600,7 @@ export function BoardStage({ model, stageRef: externalStageRef, sizeRef: externa
       default:
         break;
     }
+    store.setSnapHint(null);
     interaction.current = { kind: 'idle' };
   };
 
@@ -572,6 +682,10 @@ export function BoardStage({ model, stageRef: externalStageRef, sizeRef: externa
         cancelInteraction();
       }}
       onContextMenu={(e) => e.preventDefault()}
+      onPointerLeave={() => {
+        presence?.setCursor(null);
+        scheduleHover(null, { x: 0, y: 0 });
+      }}
       data-testid="board-canvas"
     >
       <Stage
@@ -631,6 +745,25 @@ export function BoardStage({ model, stageRef: externalStageRef, sizeRef: externa
               dash={[6 / camera.zoom, 4 / camera.zoom]}
             />
           ))}
+          {peers.map((p) => {
+            if (!p.selection.length || !cursorVisible(p, caps?.role ?? 'viewer', settings?.showStudentCursors !== false)) return null;
+            const onPage = p.selection.filter((id) => model.getObject(id)?.pageId === pageId);
+            const b = onPage.length ? model.boundsOf(onPage) : null;
+            if (!b) return null;
+            const pad = 4 / camera.zoom;
+            return (
+              <KRect
+                key={`sel-${p.clientId}`}
+                x={b.x - pad}
+                y={b.y - pad}
+                width={b.width + pad * 2}
+                height={b.height + pad * 2}
+                stroke={p.user.color}
+                strokeWidth={1.5 / camera.zoom}
+                dash={[4 / camera.zoom, 3 / camera.zoom]}
+              />
+            );
+          })}
           {handles.map((h) => (
             <Circle
               key={h.id}
@@ -655,9 +788,87 @@ export function BoardStage({ model, stageRef: externalStageRef, sizeRef: externa
             />
           )}
           {tool?.renderOverlay?.(toolCtx) as ReactNode}
+          {snapHint && <SnapMarker hint={snapHint} zoom={camera.zoom} color={accent} />}
         </Layer>
       </Stage>
+      {hover && <AuthorTooltip model={model} people={people} id={hover.id} x={hover.x} y={hover.y} />}
     </div>
+  );
+}
+
+/** «Кто нарисовал»: автор, время создания и последнего изменения. */
+function AuthorTooltip({ model, people, id, x, y }: { model: BoardModel; people?: PeopleDirectory; id: string; x: number; y: number }) {
+  const o = model.getObject(id);
+  if (!o) return null;
+  const name = (uid: string) => people?.get(uid)?.fullName ?? 'участник доски';
+  return (
+    <div className="author-tip" style={{ left: x + 14, top: y + 18 }} role="tooltip">
+      <div>
+        <strong>{name(o.createdBy)}</strong> · {formatTime(o.createdAt)}
+      </div>
+      {(o.updatedBy !== o.createdBy || o.updatedAt - o.createdAt > 60_000) && (
+        <div className="muted">
+          изменено: {name(o.updatedBy)} · {formatTime(o.updatedAt)}
+        </div>
+      )}
+      {o.locked && <div className="muted">заблокировано учителем</div>}
+    </div>
+  );
+}
+
+/** Маркер привязки: вид зависит от типа точки, рядом — подпись. */
+function SnapMarker({ hint, zoom, color }: { hint: SnapResult; zoom: number; color: string }) {
+  const r = 6 / zoom;
+  const sw = 1.5 / zoom;
+  const { x, y } = hint.point;
+  const fill = 'rgba(255,255,255,0.6)';
+  let shape: ReactNode;
+  switch (hint.kind) {
+    case 'intersection':
+      shape = (
+        <Shape
+          sceneFunc={(c, sh) => {
+            c.beginPath();
+            c.moveTo(x - r, y - r);
+            c.lineTo(x + r, y + r);
+            c.moveTo(x + r, y - r);
+            c.lineTo(x - r, y + r);
+            c.strokeShape(sh);
+          }}
+          stroke={color}
+          strokeWidth={sw * 1.3}
+        />
+      );
+      break;
+    case 'midpoint':
+      shape = (
+        <Shape
+          sceneFunc={(c, sh) => {
+            c.beginPath();
+            c.moveTo(x, y - r);
+            c.lineTo(x + r, y + r * 0.8);
+            c.lineTo(x - r, y + r * 0.8);
+            c.closePath();
+            c.fillStrokeShape(sh);
+          }}
+          stroke={color}
+          strokeWidth={sw}
+          fill={fill}
+        />
+      );
+      break;
+    case 'center':
+    case 'quadrant':
+      shape = <Circle x={x} y={y} radius={r} stroke={color} strokeWidth={sw} fill={fill} />;
+      break;
+    default:
+      shape = <KRect x={x - r} y={y - r} width={r * 2} height={r * 2} stroke={color} strokeWidth={sw} fill={fill} />;
+  }
+  return (
+    <Group listening={false}>
+      {shape}
+      <Text x={x + r * 2.2} y={y + r * 1.2} text={SNAP_LABELS[hint.kind]} fontSize={11 / zoom} fill={color} />
+    </Group>
   );
 }
 
