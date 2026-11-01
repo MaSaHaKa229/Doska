@@ -15,7 +15,7 @@
 
 ## 2. Что сделано
 
-Ветка `stage-1-architecture`; последний коммит кода — этап 5.2b (хеш — в таблице ниже), затем коммит с `HANDOFF.md`. Ветка `main` указывает на коммит этапа 1 (`21e5b4a`). Открыт пулл-реквест #1 `stage-1-architecture` → `main`.
+Ветка `stage-1-architecture`; последний коммит кода — `c8961a3` (этап 5.2b), затем коммит с `HANDOFF.md`. Ветка `main` указывает на коммит этапа 1 (`21e5b4a`). Открыт пулл-реквест #1 `stage-1-architecture` → `main`.
 
 | Этап | Коммит | Основные файлы |
 |---|---|---|
@@ -26,7 +26,7 @@
 | 3.1. Доски, папки, сервер реального времени | 01efee1 | `backend/src/boards/`, `backend/src/realtime/{guard,room,server,persistence,connection,doc,rate-limit}.ts`, `frontend/src/pages/boards/` |
 | 3.2. Ядро холста | f268dd7 | `frontend/src/{collab,canvas,objects,tools,plugins}/`, `frontend/src/pages/board/` |
 | 3.3. Присутствие, офлайн, привязки, Ctrl+K, справка | 505e9f3 | `frontend/src/collab/{presence,people}.ts`, `frontend/src/canvas/snapping.ts`, `frontend/src/pages/board/{PresenceUi,ViewMenu,Palette,boardCommands}.tsx`, эндпоинт `GET /api/boards/:id/people` |
-| 5.2b. Текст: форматирование, формулы, таблицы | HASH52B | `frontend/src/text/{schema,render}.ts`, `frontend/src/objects/text.tsx`, `frontend/src/pages/board/TextEditor.tsx`, `frontend/src/tools/text-tool.tsx`; `ObjectModule.applyResize`; `e2e/text.cjs` |
+| 5.2b. Текст: форматирование, формулы, таблицы | c8961a3 | `frontend/src/text/{schema,render}.ts`, `frontend/src/objects/text.tsx`, `frontend/src/pages/board/TextEditor.tsx`, `frontend/src/tools/text-tool.tsx`; `ObjectModule.applyResize`; `e2e/text.cjs` |
 | 5.2a. Файлы: хранилище, картинки, PDF как фон | 0748405 | `backend/src/assets/{storage,sniff,assets.service,assets.routes}.ts`; `frontend/src/media/{prepareImage,imageCache,insert,pdf}.ts`, `frontend/src/objects/image.tsx`, `frontend/src/canvas/PdfBackground.tsx`, `frontend/src/pages/board/MediaUi.tsx`, `frontend/src/tools/media-tool.tsx`; `e2e/media.cjs` |
 | 5.1. Рисование: перо, маркер, ластик, распознавание фигур | a8b7309 | `frontend/src/objects/stroke/{geometry,stroke}.ts(x)`, `frontend/src/tools/draw-tools.tsx`; расширен `ToolContext` (`packages/shared/src/plugins/types.ts`); `e2e/drawing.cjs` |
 | 4.2. Задания, главная ученика, миниатюры | 1079aab | `backend/src/assignments/`, `backend/src/boards/work-info.ts`, `backend/src/realtime/state.ts`, `?lite=1` в `realtime/{server,room}.ts`; `frontend/src/pages/assignments/`, `frontend/src/pages/board/WorkBar.tsx`, `frontend/src/canvas/BoardThumbnail.tsx`, `frontend/src/ui/Thumbs.tsx`, `e2e/assignments.cjs` |
