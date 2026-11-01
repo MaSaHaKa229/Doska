@@ -13,3 +13,6 @@ export * from './plugins/types.js';
 export * from './plugins/registry.js';
 export * from './api/errors.js';
 export * from './api/auth.js';
+export * from './api/translit.js';
+export * from './api/csv.js';
+export * from './api/admin.js';

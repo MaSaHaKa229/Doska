@@ -17,6 +17,7 @@ import { AuthService } from './auth/auth.service.js';
 import { authPlugin } from './auth/auth.plugin.js';
 import { authRoutes } from './auth/auth.routes.js';
 import { healthRoutes } from './health/health.routes.js';
+import { adminRoutes } from './admin/admin.routes.js';
 
 export interface BuildAppOptions {
   config: AppConfig;
@@ -67,6 +68,7 @@ export async function buildApp({ config, prisma, extend }: BuildAppOptions): Pro
 
   await app.register(healthRoutes, { prefix: '/api' });
   await app.register(authRoutes, { prefix: '/api/auth' });
+  await app.register(adminRoutes, { prefix: '/api/admin' });
 
   if (extend) await extend(app);
 

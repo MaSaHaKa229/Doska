@@ -1,5 +1,6 @@
 import type { FastifyError, FastifyReply, FastifyRequest } from 'fastify';
 import { ZodError } from 'zod';
+import { Prisma } from '@prisma/client';
 import type { ApiErrorBody, ApiErrorCode } from '@doska/shared';
 
 /** Ошибка приложения с HTTP-статусом и стабильным кодом. */
@@ -54,6 +55,16 @@ export function errorHandler(error: FastifyError | Error, request: FastifyReques
   if (error instanceof AppError) {
     if (error.statusCode >= 500) request.log.error({ err: error }, error.message);
     return send(reply, error.statusCode, error.code, error.message, error.details);
+  }
+  if (error instanceof Prisma.PrismaClientKnownRequestError) {
+    // Нарушение уникальности (гонка между проверкой и записью) и «запись не найдена».
+    if (error.code === 'P2002') {
+      const target = String((error.meta as { target?: unknown } | undefined)?.target ?? '');
+      return target.includes('login')
+        ? send(reply, 409, 'CONFLICT', 'Логин уже занят', { login: ['Логин уже занят'] })
+        : send(reply, 409, 'CONFLICT', 'Запись с такими данными уже существует');
+    }
+    if (error.code === 'P2025') return send(reply, 404, 'NOT_FOUND', 'Не найдено');
   }
   if (error instanceof ZodError) {
     return send(reply, 400, 'VALIDATION_ERROR', 'Проверьте правильность заполнения полей', zodDetails(error));

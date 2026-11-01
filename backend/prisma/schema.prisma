@@ -34,8 +34,8 @@ enum UserRole {
 model User {
   id                 String    @id @default(uuid()) @db.Uuid
   /// Логин хранится в нижнем регистре; уникален среди всех пользователей.
-  /// При удалении логин переименовывается в "<login>#deleted#<epoch>",
-  /// чтобы его можно было выдать заново.
+  /// При удалении логин заменяется на "deleted.<id>", чтобы его можно было
+  /// выдать заново (исходный логин сохраняется в журнале USER_DELETED).
   login              String    @unique @db.VarChar(64)
   fullName           String    @db.VarChar(200)
   role               UserRole
