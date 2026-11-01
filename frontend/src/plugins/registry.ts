@@ -8,6 +8,10 @@ import { strokeModule } from '../objects/stroke/stroke';
 import { imageModule } from '../objects/image';
 import { textModule } from '../objects/text';
 import { textTool } from '../tools/text-tool';
+import { formulaModule, FORMULA_TYPE } from '../objects/formula';
+import { solutionModule } from '../objects/solution';
+import { formulaTool, solutionTool } from '../tools/formula-tools';
+import { allPaletteItems } from '../formula/palette';
 import { mediaTool } from '../tools/media-tool';
 
 /**
@@ -18,8 +22,16 @@ import { mediaTool } from '../tools/media-tool';
 export const corePlugin: BoardPlugin<ReactNode> = {
   id: 'core',
   title: 'Основные',
-  objects: [shapeModule, groupModule, strokeModule, imageModule, textModule],
-  tools: [selectTool, handTool, laserTool, penTool, markerTool, eraserTool, ...(['rect', 'ellipse', 'triangle', 'line', 'arrow'] as const).map(shapeTool), textTool, mediaTool],
+  objects: [shapeModule, groupModule, strokeModule, imageModule, textModule, formulaModule, solutionModule],
+  // Шаблоны палитры формул ищутся в Ctrl+K и вставляются готовой формулой.
+  commands: allPaletteItems().map((it, n) => ({
+    id: `core.formula.insert-${n}`,
+    title: `Формула: ${it.title.toLowerCase()}`,
+    section: `Формулы · ${it.section}`,
+    keywords: [...it.keywords, 'формула'],
+    action: { kind: 'insert' as const, objectType: FORMULA_TYPE, props: { latex: it.example } },
+  })),
+  tools: [selectTool, handTool, laserTool, penTool, markerTool, eraserTool, ...(['rect', 'ellipse', 'triangle', 'line', 'arrow'] as const).map(shapeTool), textTool, formulaTool, solutionTool, mediaTool],
 };
 
 /**

@@ -15,7 +15,7 @@
 
 ## 2. Что сделано
 
-Ветка `stage-1-architecture`; последний коммит кода — `c8961a3` (этап 5.2b), затем коммит с `HANDOFF.md`. Ветка `main` указывает на коммит этапа 1 (`21e5b4a`). Открыт пулл-реквест #1 `stage-1-architecture` → `main`.
+Ветка `stage-1-architecture`; последний коммит кода — `XXXXXXX` (этап 5.3a), затем коммит с `HANDOFF.md`. Ветка `main` указывает на коммит этапа 1 (`21e5b4a`). Открыт пулл-реквест #1 `stage-1-architecture` → `main`.
 
 | Этап | Коммит | Основные файлы |
 |---|---|---|
@@ -26,13 +26,22 @@
 | 3.1. Доски, папки, сервер реального времени | 01efee1 | `backend/src/boards/`, `backend/src/realtime/{guard,room,server,persistence,connection,doc,rate-limit}.ts`, `frontend/src/pages/boards/` |
 | 3.2. Ядро холста | f268dd7 | `frontend/src/{collab,canvas,objects,tools,plugins}/`, `frontend/src/pages/board/` |
 | 3.3. Присутствие, офлайн, привязки, Ctrl+K, справка | 505e9f3 | `frontend/src/collab/{presence,people}.ts`, `frontend/src/canvas/snapping.ts`, `frontend/src/pages/board/{PresenceUi,ViewMenu,Palette,boardCommands}.tsx`, эндпоинт `GET /api/boards/:id/people` |
+| 5.3a. Формулы: MathLive, палитра, «Решение» | XXXXXXX | `frontend/src/formula/{palette,mathlive,FormulaDialog,latex-to-mathjs,check}.ts(x)`, `frontend/src/objects/{formula,solution}.tsx`, `frontend/src/tools/formula-tools.tsx`, `frontend/src/pages/board/FormulaEditors.tsx`; плагин шрифтов MathLive в `frontend/vite.config.ts`; `e2e/formula.cjs` |
 | 5.2b. Текст: форматирование, формулы, таблицы | c8961a3 | `frontend/src/text/{schema,render}.ts`, `frontend/src/objects/text.tsx`, `frontend/src/pages/board/TextEditor.tsx`, `frontend/src/tools/text-tool.tsx`; `ObjectModule.applyResize`; `e2e/text.cjs` |
 | 5.2a. Файлы: хранилище, картинки, PDF как фон | 0748405 | `backend/src/assets/{storage,sniff,assets.service,assets.routes}.ts`; `frontend/src/media/{prepareImage,imageCache,insert,pdf}.ts`, `frontend/src/objects/image.tsx`, `frontend/src/canvas/PdfBackground.tsx`, `frontend/src/pages/board/MediaUi.tsx`, `frontend/src/tools/media-tool.tsx`; `e2e/media.cjs` |
 | 5.1. Рисование: перо, маркер, ластик, распознавание фигур | a8b7309 | `frontend/src/objects/stroke/{geometry,stroke}.ts(x)`, `frontend/src/tools/draw-tools.tsx`; расширен `ToolContext` (`packages/shared/src/plugins/types.ts`); `e2e/drawing.cjs` |
 | 4.2. Задания, главная ученика, миниатюры | 1079aab | `backend/src/assignments/`, `backend/src/boards/work-info.ts`, `backend/src/realtime/state.ts`, `?lite=1` в `realtime/{server,room}.ts`; `frontend/src/pages/assignments/`, `frontend/src/pages/board/WorkBar.tsx`, `frontend/src/canvas/BoardThumbnail.tsx`, `frontend/src/ui/Thumbs.tsx`, `e2e/assignments.cjs` |
 | 4.1. Уроки и права учителя | 5c1abc8 | `backend/src/realtime/lesson.ts`, `room.ts`; `GET /api/directory/users`, `mode` в `PATCH /api/boards/:id`; `frontend/src/pages/board/{LessonUi,LaserLayer,useFollow}.tsx`, `frontend/src/pages/boards/AccessDialog.tsx`, `frontend/src/collab/{laser,follow}.ts`, `frontend/src/tools/availability.ts`, `e2e/` |
 
-Тесты: 76 в `packages/shared`, 110 в `backend`, 94 в `frontend`. Все проходят. Сквозные сценарии `e2e/lesson.cjs`, `e2e/assignments.cjs`, `e2e/drawing.cjs`, `e2e/media.cjs` и `e2e/text.cjs` прошли в браузере (см. `e2e/README.md`; подряд все пять упираются в ограничение частоты входов — см. там же).
+Тесты: 76 в `packages/shared`, 110 в `backend`, 101 в `frontend`. Все проходят. Сквозные сценарии `e2e/lesson.cjs`, `e2e/assignments.cjs`, `e2e/drawing.cjs`, `e2e/media.cjs`, `e2e/text.cjs` и `e2e/formula.cjs` прошли в браузере (см. `e2e/README.md`; подряд все шесть упираются в ограничение частоты входов — см. там же).
+
+**Что вошло в 5.3a (5.3 разделён по согласию пользователя: 5.3a — редактор и «Решение», 5.3b — калькулятор и распознавание):**
+- **Редактор формул** (`FormulaDialog`): MathLive 0.111.1 (визуальный ввод, быстрые сочетания `sqrt`, `frac`, `alpha`, `->`, `<=>`, `+-`, `deg`, `RR` и др., экранная клавиатура внутри `<dialog>`), режим «Код LaTeX», Enter — сохранить. Палитра (`formula/palette.ts`): 8 разделов, у шаблона `template` (с `#?`/`#0`), `example` (кнопка и вставка из Ctrl+K) и ключевые слова. Тот же диалог открывает кнопка Σ в текстовом редакторе (старый `MathDialog` удалён).
+- **Объект `core.formula`** (`latex`, `size`, `color`): картинка через `foreignObject` (KaTeX → MathML), растяжение меняет кегль. Инструмент F, двойной щелчок — правка.
+- **Объект `core.solution`** (`title`, `steps[{latex, note}]`, `w`, `size`, `check`): таблица шагов, отметки ✓/✗/? между шагами. Инструмент Shift+F, редактор `SolutionDialog` (шаги, комментарии, порядок, удаление; новый шаг начинается с копии предыдущего).
+- **Проверка переходов** (`formula/check.ts`, math.js 15.2.0 отдельным чанком): LaTeX → math.js (`latex-to-mathjs.ts`, школьное подмножество, иначе `null`); выражения сравниваются в 8 случайных точках; уравнения — `ok`, если `lhs−rhs` пропорциональны с ненулевым коэффициентом, иначе `unknown` (`bad` только для выражений).
+- **Ctrl+K:** все шаблоны палитры ищутся по названию и ключевым словам, готовая формула ставится в центр экрана.
+- **Общее:** `text/render.ts` получил `measureElement`, `elementSvg`, `rasterize` для любой разметки; `EDIT_OBJECT_EVENT` открывает редактор объекта по его `editor`.
 
 **Что вошло в 5.2b:**
 - **Объект `core.text`:** `doc` (ProseMirror JSON), `w` (ширина переноса), `h` (измеренная высота), `fill` (подложка). Схема `text/schema.ts` (TipTap 3.32.0): StarterKit без ссылок, кода и линии; цвет и размер шрифта; выравнивание; таблицы; формула `mathInline` (атом с LaTeX; ввод `$…$` своим `InputRule`). `normalizeDoc` отклоняет чужие узлы и метки и вычищает цвета и размеры вне набора.
@@ -80,7 +89,7 @@
 
 ## 3. Текущее состояние
 
-- **Где остановились.** Подэтап 5.2b закрыт и запушен — этап 5.2 завершён. Пользователю отправлен план 5.3. Ждём «Продолжай» на 5.3. Незавершённых правок нет.
+- **Где остановились.** Подэтап 5.3a закрыт и запушен. Пользователю отправлен план 5.3b. Ждём «Продолжай» на 5.3b. Незавершённых правок нет.
 - **Сломанного не известно.** Плавающий сбой тестов бэкенда найден и исправлен в 5.1 (см. выше).
 - **Точки расширения, которые заполнят следующие этапы (не заглушки):**
   - камеры 3D-сцен для «Следуйте за мной»: реестр `frontend/src/collab/follow.ts` (`registerSceneCamera`, `notifySceneCamera`) — сцены регистрируются на этапе 6.4;
@@ -146,6 +155,12 @@
 - **Подводный камень:** в картинке-SVG нет глобальных стилей приложения — поэтому `box-sizing` и всё прочее задано в `TEXT_CSS` явно, иначе таблицы на холсте шире, чем в редакторе.
 - **Размер:** TipTap и KaTeX — в чанке доски (вместе с Konva около 365 КБ в gzip), основной бандл не вырос.
 
+**Формулы (5.3a):**
+- **MathLive и math.js — отдельные чанки** (динамический `import`): доска без формул их не грузит. Шрифты MathLive отдаёт свой плагин Vite (`/mathlive-fonts/`, в сборке — файлы в `dist/mathlive-fonts`), `MathfieldElement.fontsDirectory` указывает туда; CDN не используется.
+- **На холсте формулы рисует KaTeX (MathML), а не MathLive:** не нужны шрифты внутри `foreignObject`, тот же путь, что у текста.
+- **Проверка шагов — числовая подсказка, не символьная система:** без CAS (nerdamer/sympy отвергнуты — вес и неполнота). Неравносильность уравнений не утверждается (`?`, а не `✗`): численно отличить потерю корня от ошибки нельзя.
+- Отметки считаются у каждого клиента, в документ не пишутся.
+
 **Файлы (5.2a):**
 - **Файлы отдаёт бэкенд, а не presigned-ссылки MinIO:** нужен вход, MinIO не торчит наружу, хранилище на диске работает так же. Читать файл может любой вошедший пользователь, знающий его случайный UUID. id есть только в документах досок, которые он видит; копии заданий, шаблоны и вставка между досками ссылаются на тот же файл, поэтому привязка «файл — одна доска» не подходит. Загружать можно только на доску с правом записи.
 - **Метаданные удаляются разбором структуры, без `sharp` и перекодирования:** нет нативной зависимости, качество не теряется. Перекодирование делает браузер перед загрузкой — это и поворот по EXIF, и защита на случай загрузки в обход интерфейса.
@@ -160,7 +175,7 @@
 
 ## 5. Что осталось
 
-1. **5.3.** Формулы: MathLive и палитра, быстрый ввод, блок «Решение», калькулятор на math.js, распознавание рукописных формул.
+1. **5.3b.** Калькулятор на math.js (единицы измерения, результат на доску объектом `core.calc`), распознавание рукописных формул: свой контейнер pix2tex (профиль `ocr`), `FORMULA_OCR_URL`, пустая переменная выключает функцию.
 2. **6.1–6.5.** Математика — по одному подразделу за ответ.
 3. **7.1–7.8.** Физика — по одному подразделу за ответ.
 4. **8.1.** Библиотека шаблонов, справочник формул. **8.2.** Экспорт PNG/SVG/PDF, интерфейс истории версий и восстановление (семантическое, по `docs/SYNC_PROTOCOL.md`, раздел 12).
@@ -222,6 +237,9 @@ node /home/user/Doska/node_modules/vite/bin/vite.js /home/user/Doska/frontend --
 - В `sceneFunc` Konva рисовать через `ctx._context`: на обёртке Konva присваивание `strokeStyle` не работает.
 - Конкурентные правки одного поля Yjs выигрывает больший clientID. В тестах с несколькими клиентами синхронизировать их перед правками, иначе тест плавает.
 - Разделы-плагины подключаются автоматически: файлы `frontend/src/{math,physics}/**/plugin.ts`. Тип объекта обязан начинаться с id плагина. Иконки инструментов регистрировать через `registerIcons` (`frontend/src/ui/icons.ts`).
+
+- MathLive: настраивать поле (`inlineShortcuts` и т. п.) только после события `mount`, иначе «Mathfield not mounted»; начальное значение — атрибутами и `textContent`. В Playwright вводить в поле `math-field` через `keyboard`, а в «Код LaTeX» — `fill`.
+- `latex-to-mathjs`: аргумент без скобок — один символ, как в LaTeX (`x^23` = x²·3, `\log_2 8`). Десятичная запятая — `2{,}5` и `2,5` между цифрами.
 
 **Git:**
 - Коммитить в ветку `stage-1-architecture`, отправлять `git push origin stage-1-architecture`.

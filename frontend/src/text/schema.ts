@@ -32,18 +32,18 @@ const KATEX_OPTIONS = { output: 'mathml', throwOnError: false, trust: false, str
 export const MAX_LATEX = 1000;
 
 /** MathML формулы (KaTeX). Ошибка в формуле показывается красным текстом самой формулы. */
-export function latexToMathML(latex: string): string {
-  return katex.renderToString(latex.slice(0, MAX_LATEX), KATEX_OPTIONS);
+export function latexToMathML(latex: string, displayMode = false): string {
+  return katex.renderToString(latex.slice(0, MAX_LATEX), { ...KATEX_OPTIONS, displayMode });
 }
 
 /** DOM-элемент формулы (для редактора и для отрисовки). */
-export function mathElement(latex: string, doc: Document = document): HTMLElement {
+export function mathElement(latex: string, doc: Document = document, displayMode = false): HTMLElement {
   const span = doc.createElement('span');
   span.className = 'math-inline';
   span.setAttribute('data-latex', latex);
   // Разбор строки KaTeX через DOMParser: скрипты в разобранном документе не выполняются,
   // а KaTeX с trust: false не порождает ссылок и обработчиков.
-  const parsed = new DOMParser().parseFromString(latexToMathML(latex), 'text/html');
+  const parsed = new DOMParser().parseFromString(latexToMathML(latex, displayMode), 'text/html');
   const math = parsed.body.firstElementChild;
   if (math) span.appendChild(doc.importNode(math, true));
   else span.textContent = latex;

@@ -19,12 +19,11 @@ import { currentCamera, useBoard } from '../../store/board';
 import { worldToScreen, type Size } from '../../canvas/camera';
 import { resolveColor, type CanvasTheme } from '../../objects/colors';
 import { TEXT_TYPE, type TextProps } from '../../objects/text';
-import { FONT_SIZES, TEXT_COLOR_TOKENS, colorVar, isEmptyDoc, mathElement, normalizeDoc, textExtensions, MAX_LATEX } from '../../text/schema';
+import { FONT_SIZES, TEXT_COLOR_TOKENS, colorVar, isEmptyDoc, normalizeDoc, textExtensions, MAX_LATEX } from '../../text/schema';
+import { FormulaDialog } from '../../formula/FormulaDialog';
 import { TEXT_CSS, colorVars, measureTextHeight } from '../../text/render';
 import { EDIT_TEXT_EVENT, type EditTextDetail } from '../../tools/text-tool';
 import { toast } from '../../store/toast';
-import { Button } from '../../ui/Button';
-import { Dialog } from '../../ui/Dialog';
 
 /** Как часто сохранять текст во время набора (другие участники видят его по ходу). */
 const SAVE_DELAY_MS = 700;
@@ -234,7 +233,7 @@ function TextEditor({
       >
         <EditorContent editor={editor} />
       </div>
-      <MathDialog
+      <FormulaDialog
         request={mathEdit}
         onClose={() => setMathEdit(null)}
         onSave={(latex) => {
@@ -377,49 +376,3 @@ function TextToolbar({ editor, anchorY, blockBottom, left, onMath }: { editor: E
     </div>
   );
 }
-
-/** Ввод формулы в LaTeX с предпросмотром (палитра шаблонов и MathLive — этап 5.3). */
-function MathDialog({ request, onClose, onSave }: { request: { latex: string } | null; onClose: () => void; onSave: (latex: string) => void }) {
-  const [latex, setLatex] = useState('');
-  const previewRef = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    if (request) setLatex(request.latex);
-  }, [request]);
-  useEffect(() => {
-    const el = previewRef.current;
-    if (!el) return;
-    el.replaceChildren(latex.trim() ? mathElement(latex) : document.createTextNode('Предпросмотр формулы'));
-  }, [latex, request]);
-  return (
-    <Dialog
-      open={!!request}
-      onClose={onClose}
-      title="Формула"
-      onSubmit={() => onSave(latex)}
-      footer={
-        <>
-          <Button onClick={onClose}>Отмена</Button>
-          <Button type="submit" variant="primary" disabled={!latex.trim()}>
-            {request?.latex ? 'Сохранить' : 'Вставить'}
-          </Button>
-        </>
-      }
-    >
-      <label className="field">
-        <span className="field__label">LaTeX</span>
-        <textarea
-          className="input mono"
-          rows={3}
-          maxLength={MAX_LATEX}
-          value={latex}
-          autoFocus
-          onChange={(e) => setLatex(e.target.value)}
-          placeholder="\frac{a}{b} + x^2 = \sqrt{c}"
-        />
-      </label>
-      <div className="math-preview" ref={previewRef} aria-live="polite" />
-      <div className="small muted">При наборе текста формулу можно ввести между знаками доллара: $x^2$. Двойной щелчок по формуле в тексте — изменить её.</div>
-    </Dialog>
-  );
-}
-

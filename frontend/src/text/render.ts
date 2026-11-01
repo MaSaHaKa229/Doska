@@ -64,16 +64,25 @@ function host(): HTMLDivElement {
   return measureHost;
 }
 
-/** Высота блока ширины w (мировые единицы = CSS-пиксели при масштабе 1). */
-export function measureTextHeight(doc: JSONContent, w: number): number {
+/**
+ * Размер элемента в странице (тот же CSS, что у картинки). width — ширина
+ * переноса; null — по содержимому (формула).
+ */
+export function measureElement(el: HTMLElement, width: number | null): { width: number; height: number } {
   const h = host();
   const box = document.createElement('div');
-  box.style.width = `${w}px`;
-  box.appendChild(docToElement(doc));
+  if (width === null) box.style.cssText = 'display:inline-block;width:max-content';
+  else box.style.width = `${width}px`;
+  box.appendChild(el);
   h.appendChild(box);
-  const height = Math.ceil(box.getBoundingClientRect().height);
+  const r = box.getBoundingClientRect();
   box.remove();
-  return Math.max(height, Math.ceil(20 * 1.35 + TEXT_PADDING * 2));
+  return { width: Math.ceil(r.width), height: Math.ceil(r.height) };
+}
+
+/** Высота блока ширины w (мировые единицы = CSS-пиксели при масштабе 1). */
+export function measureTextHeight(doc: JSONContent, w: number): number {
+  return Math.max(measureElement(docToElement(doc), w).height, Math.ceil(20 * 1.35 + TEXT_PADDING * 2));
 }
 
 /** Масштаб картинки: степень двойки, не меньше 0,5 и не больше 8 (повторная отрисовка — только при заметной смене масштаба). */
@@ -87,9 +96,14 @@ const MAX_PIXELS = 16_000_000;
 
 /** SVG-документ блока (строка). */
 export function textSvg(doc: JSONContent, w: number, h: number, theme: CanvasTheme, fill: string | null, scale: number): string {
+  return elementSvg(docToElement(doc), w, h, theme, fill, scale);
+}
+
+/** SVG с элементом (XHTML) внутри foreignObject — общий путь текста, формул и решений. */
+export function elementSvg(el: HTMLElement, w: number, h: number, theme: CanvasTheme, fill: string | null, scale: number): string {
   let s = scale;
   if (w * h * s * s > MAX_PIXELS) s = Math.sqrt(MAX_PIXELS / (w * h));
-  const xhtml = new XMLSerializer().serializeToString(docToElement(doc));
+  const xhtml = new XMLSerializer().serializeToString(el);
   const bg = fill ? `background:${fill};` : '';
   return (
     `<svg xmlns="http://www.w3.org/2000/svg" width="${Math.ceil(w * s)}" height="${Math.ceil(h * s)}" viewBox="0 0 ${w} ${h}">` +
@@ -104,7 +118,11 @@ const CACHE_LIMIT = 300;
 
 /** Картинка блока (с кэшем по содержимому, размеру, теме и масштабу). */
 export function rasterizeText(doc: JSONContent, w: number, h: number, theme: CanvasTheme, fill: string | null, scale: number): Promise<HTMLImageElement> {
-  const key = `${theme}|${fill}|${w}|${h}|${scale}|${JSON.stringify(doc)}`;
+  return rasterize(`text|${theme}|${fill}|${w}|${h}|${scale}|${JSON.stringify(doc)}`, () => textSvg(doc, w, h, theme, fill, scale));
+}
+
+/** Картинка из SVG-строки с кэшем по ключу (ключ должен описывать всё содержимое). */
+export function rasterize(key: string, svg: () => string): Promise<HTMLImageElement> {
   let p = cache.get(key);
   if (p) {
     // Свежие ключи — в конец (вытесняются самые старые).
@@ -116,7 +134,7 @@ export function rasterizeText(doc: JSONContent, w: number, h: number, theme: Can
     const img = new Image();
     img.onload = () => resolve(img);
     img.onerror = () => reject(new Error('Не удалось отрисовать текст'));
-    img.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(textSvg(doc, w, h, theme, fill, scale))}`;
+    img.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg())}`;
   });
   p.catch(() => cache.delete(key));
   cache.set(key, p);

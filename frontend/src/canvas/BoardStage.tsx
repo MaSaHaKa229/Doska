@@ -16,6 +16,7 @@ import { HAND_TOOL_ID, LASER_TOOL_ID, SELECT_TOOL_ID } from '../tools/shape-tool
 import { toolUnavailable } from '../tools/availability';
 import { PdfBackground } from './PdfBackground';
 import { requestEditText } from '../tools/text-tool';
+import { requestObjectEditor } from '../tools/formula-tools';
 import { StrokeShape } from '../objects/stroke/stroke';
 import { compactForPresence } from '../objects/stroke/geometry';
 import { PEN_TOOL_ID } from '../tools/draw-tools';
@@ -732,11 +733,14 @@ export function BoardStage({ model, stageRef: externalStageRef, sizeRef: externa
       }}
       onContextMenu={(e) => e.preventDefault()}
       onDoubleClick={(e) => {
-        // Двойной щелчок по тексту открывает редактор.
+        // Двойной щелчок по тексту, формуле или решению открывает редактор.
         if (!pageId || toolId !== SELECT_TOOL_ID) return;
         const world = toWorld(screenPoint(e));
-        const id = model.hitTest(pageId, world, HIT_TOLERANCE_PX / currentCamera().zoom).find((h) => model.get(h)?.module?.editor === 'text');
-        if (id) requestEditText(id);
+        const id = model.hitTest(pageId, world, HIT_TOLERANCE_PX / currentCamera().zoom).find((h) => model.get(h)?.module?.editor);
+        const editor = id ? model.get(id)?.module?.editor : undefined;
+        if (!id || !editor) return;
+        if (editor === 'text') requestEditText(id);
+        else if (editor === 'formula' || editor === 'solution') requestObjectEditor({ editor, id, at: null });
       }}
       onPointerLeave={() => {
         presence?.setCursor(null);

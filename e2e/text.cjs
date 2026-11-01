@@ -59,7 +59,9 @@ const texts = (page) =>
   // Формула через диалог.
   await toolbar.getByRole('button', { name: /Формула/ }).click();
   const dlg = teacher.locator('dialog[open]');
-  await dlg.locator('textarea').fill('\\frac{-b \\pm \\sqrt{D}}{2a}');
+  // Редактор формул MathLive (этап 5.3a): вводим кодом LaTeX.
+  await dlg.getByRole('button', { name: 'Код LaTeX' }).click();
+  await dlg.getByLabel('Код LaTeX').fill('\\frac{-b \\pm \\sqrt{D}}{2a}');
   await dlg.getByRole('button', { name: 'Вставить' }).click();
   await teacher.keyboard.press('Enter');
   await toolbar.getByRole('button', { name: 'Вставить таблицу 3×3' }).click();

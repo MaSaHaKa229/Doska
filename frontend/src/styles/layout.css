@@ -993,3 +993,91 @@ kbd {
   text-align: center;
   overflow-x: auto;
 }
+
+/* ----- Редактор формул (этап 5.3a) ----- */
+.formula-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.formula-palette__tabs {
+  flex-wrap: wrap;
+  margin-bottom: 6px;
+}
+.formula-palette__items {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  max-height: 150px;
+  overflow-y: auto;
+}
+.palette-btn {
+  min-width: 52px;
+  height: 44px;
+  padding: 2px 8px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.95rem;
+  overflow: hidden;
+}
+.palette-btn:hover {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+.formula-host math-field,
+.formula-field {
+  display: block;
+  width: 100%;
+  min-height: 64px;
+  padding: 8px 10px;
+  border: 1px solid var(--border-strong);
+  border-radius: 10px;
+  font-size: 1.6rem;
+  background: var(--surface);
+  color: var(--text);
+}
+.formula-host math-field:focus-within {
+  outline: 2px solid var(--focus);
+}
+.solution-steps {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 50vh;
+  overflow-y: auto;
+}
+.solution-step {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.solution-step__num {
+  width: 2em;
+  text-align: right;
+  color: var(--text-3);
+}
+.solution-step__formula {
+  min-width: 160px;
+  max-width: 50%;
+  min-height: 40px;
+  padding: 4px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text);
+  font-size: 1.15rem;
+  overflow-x: auto;
+  cursor: pointer;
+}
+.solution-step__formula:hover {
+  border-color: var(--accent);
+}
+.solution-step .input {
+  flex: 1;
+}

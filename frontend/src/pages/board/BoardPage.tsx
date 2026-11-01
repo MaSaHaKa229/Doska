@@ -22,6 +22,7 @@ import { FollowBanner, HandButton, HandsIndicator, LessonMenu } from './LessonUi
 import { LaserLayer } from './LaserLayer';
 import { WorkBar } from './WorkBar';
 import { TextEditorHost } from './TextEditor';
+import { FormulaEditorsHost } from './FormulaEditors';
 import { PdfImportDialog } from './MediaUi';
 import { INSERT_FILES_EVENT, type InsertFilesDetail } from '../../media/insert';
 import { toast } from '../../store/toast';
@@ -267,6 +268,7 @@ function BoardWorkspace({ session }: { session: BoardSession }) {
           <LaserLayer presence={session.presence} laser={session.laser} sizeRef={sizeRef} />
           <CursorsLayer presence={session.presence} sizeRef={sizeRef} />
           <TextEditorHost model={model} presence={session.presence} sizeRef={sizeRef} theme={theme} />
+          <FormulaEditorsHost model={model} />
           <ZoomControls commands={commands} />
         </div>
       </div>
