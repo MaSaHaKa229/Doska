@@ -67,7 +67,7 @@ export class RoomManager {
 
   /** Вызывается при отключении: пустая комната выгружается через unloadDelayMs. */
   release(room: Room): void {
-    if (room.conns.size > 0 || this.shuttingDown) return;
+    if (room.conns.size > 0 || this.shuttingDown || room.destroyed) return;
     if (room.unloadTimer) clearTimeout(room.unloadTimer);
     room.unloadTimer = setTimeout(() => {
       room.unloadTimer = null;
@@ -77,6 +77,7 @@ export class RoomManager {
 
   private async unload(room: Room): Promise<void> {
     if (this.unloading.has(room.boardId)) return this.unloading.get(room.boardId);
+    if (room.destroyed) return;
     this.rooms.delete(room.boardId);
     const p = room
       .destroy()
@@ -97,6 +98,21 @@ export class RoomManager {
 
   async closeUser(userId: string, code: number, reason: string): Promise<void> {
     for (const c of this.connectionsOfUser(userId, await this.loadedRooms())) c.close(code, reason);
+  }
+
+  /**
+   * Выгрузить все комнаты сейчас (с сохранением), подключения закрываются
+   * кодом «переподключитесь». Для тестов: дождаться окончания фоновой записи.
+   */
+  async unloadAll(): Promise<void> {
+    const rooms = await this.loadedRooms();
+    for (const room of rooms) {
+      if (room.unloadTimer) clearTimeout(room.unloadTimer);
+      room.unloadTimer = null;
+      for (const c of room.conns) c.close(CloseCode.ServerRestart, 'Доска выгружается');
+    }
+    await Promise.all(rooms.map((r) => this.unload(r)));
+    await Promise.all([...this.unloading.values()]);
   }
 
   /** Остановка сервера: сохранить все доски, клиентам — «переподключитесь». */

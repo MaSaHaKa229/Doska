@@ -1,9 +1,12 @@
 import {
   Circle,
+  Eraser,
   Hand,
+  Highlighter,
   Minus,
   MousePointer2,
   MoveUpRight,
+  PenLine,
   Square,
   Triangle,
   Zap,
@@ -17,10 +20,13 @@ import {
  */
 const ICONS: Record<string, LucideIcon> = {
   Circle,
+  Eraser,
   Hand,
+  Highlighter,
   Minus,
   MousePointer2,
   MoveUpRight,
+  PenLine,
   Square,
   Triangle,
   Zap,

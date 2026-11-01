@@ -91,6 +91,30 @@ export class Presence {
     this.patch({ tool });
   }
 
+  private pendingDrawing: AwarenessState['drawing'] | undefined;
+  private drawingTimer: ReturnType<typeof setTimeout> | null = null;
+  private lastDrawingSent = 0;
+
+  /**
+   * Недорисованный штрих (видят другие). Не чаще ~30 раз в секунду; null
+   * (штрих закончен) уходит сразу.
+   */
+  setDrawing(drawing: AwarenessState['drawing']): void {
+    this.pendingDrawing = drawing;
+    const wait = CURSOR_INTERVAL_MS - (Date.now() - this.lastDrawingSent);
+    if (drawing === null || wait <= 0) return this.flushDrawing();
+    this.drawingTimer ??= setTimeout(() => this.flushDrawing(), wait);
+  }
+
+  private flushDrawing(): void {
+    if (this.drawingTimer) clearTimeout(this.drawingTimer);
+    this.drawingTimer = null;
+    if (this.pendingDrawing === undefined) return;
+    this.lastDrawingSent = Date.now();
+    this.patch({ drawing: this.pendingDrawing });
+    this.pendingDrawing = undefined;
+  }
+
   setLaser(laser: AwarenessState['laser']): void {
     this.patch({ laser });
   }
@@ -106,6 +130,7 @@ export class Presence {
   destroy(): void {
     if (this.cursorTimer) clearTimeout(this.cursorTimer);
     if (this.viewportTimer) clearTimeout(this.viewportTimer);
+    if (this.drawingTimer) clearTimeout(this.drawingTimer);
     this.awareness.off('change', this.onChange);
     this.listeners.clear();
   }

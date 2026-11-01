@@ -30,7 +30,7 @@ let s2: TestClient;
 let ids: { teacher: string; s1: string; s2: string; s3: string; cls: string; board: string };
 
 beforeEach(async () => {
-  await resetDb();
+  await resetDb(testPrisma(), app);
   const t = await createUser({ login: 'teacher', password: 'kot12345', role: 'TEACHER', fullName: 'Учитель Один' });
   await createUser({ login: 'teacher2', password: 'kot12345', role: 'TEACHER', fullName: 'Учитель Два' });
   const a = await createUser({ login: 'anna', password: 'kot12345', role: 'STUDENT', fullName: 'Аннина Анна' });

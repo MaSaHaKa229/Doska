@@ -139,11 +139,11 @@ function BoardWorkspace({ session }: { session: BoardSession }) {
   // Отладочный доступ для сквозных тестов (только в режиме разработки).
   useEffect(() => {
     if (!import.meta.env.DEV) return;
-    (window as unknown as { __doska?: unknown }).__doska = { model, store: useBoard, commands };
+    (window as unknown as { __doska?: unknown }).__doska = { model, store: useBoard, commands, presence: session.presence };
     return () => {
       delete (window as unknown as { __doska?: unknown }).__doska;
     };
-  }, [model, commands]);
+  }, [model, commands, session]);
 
   useSyncExternalStore(useCallback((cb) => model.subscribePages(cb), [model]), () => model.pagesStamp);
   const page = pageId ? model.page(pageId) : undefined;

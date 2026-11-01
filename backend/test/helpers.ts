@@ -31,13 +31,28 @@ export function testPrisma(): PrismaClient {
   return sharedPrisma;
 }
 
-/** Очистка всех таблиц (кроме служебной таблицы миграций). */
-export async function resetDb(prisma = testPrisma()): Promise<void> {
+/**
+ * Очистка всех таблиц (кроме служебной таблицы миграций). Если передано
+ * приложение, сначала выгружаются все комнаты досок: иначе их фоновая
+ * запись (журнал, компактация после ухода участников предыдущего теста)
+ * сталкивается с TRUNCATE (deadlock 40P01). На случай редкой гонки
+ * TRUNCATE повторяется.
+ */
+export async function resetDb(prisma = testPrisma(), app?: FastifyInstance): Promise<void> {
+  if (app?.realtime) await app.realtime.unloadAll();
   const rows = await prisma.$queryRaw<{ tablename: string }[]>`
     SELECT tablename FROM pg_tables WHERE schemaname = 'public' AND tablename <> '_prisma_migrations'`;
   if (rows.length === 0) return;
   const list = rows.map((r) => `"public"."${r.tablename}"`).join(', ');
-  await prisma.$executeRawUnsafe(`TRUNCATE TABLE ${list} RESTART IDENTITY CASCADE`);
+  for (let attempt = 1; ; attempt++) {
+    try {
+      await prisma.$executeRawUnsafe(`TRUNCATE TABLE ${list} RESTART IDENTITY CASCADE`);
+      return;
+    } catch (err) {
+      if (attempt >= 5 || !String(err).includes('40P01')) throw err;
+      await new Promise((r) => setTimeout(r, 50 * attempt));
+    }
+  }
 }
 
 export async function createTestApp(

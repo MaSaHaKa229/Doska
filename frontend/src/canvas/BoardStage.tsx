@@ -14,6 +14,9 @@ import { findSnap, gridSnap, SNAP_LABELS, type SnapResult } from './snapping';
 import { resolveColor, SURFACE_COLORS, type CanvasTheme } from '../objects/colors';
 import { HAND_TOOL_ID, LASER_TOOL_ID, SELECT_TOOL_ID } from '../tools/shape-tools';
 import { toolUnavailable } from '../tools/availability';
+import { StrokeShape } from '../objects/stroke/stroke';
+import { compactForPresence } from '../objects/stroke/geometry';
+import { PEN_TOOL_ID } from '../tools/draw-tools';
 import type { LaserPointer } from '../collab/laser';
 import { toast } from '../store/toast';
 
@@ -278,6 +281,10 @@ export function BoardStage({ model, stageRef: externalStageRef, sizeRef: externa
     model.updateObjects(patches);
   };
 
+  // Присутствие для контекста инструментов (контекст создаётся один раз).
+  const presenceRef = useRef(presence);
+  presenceRef.current = presence;
+
   // ----- Контекст инструментов -----
   const toolCtx = useMemo<ToolContext>(() => {
     const s = () => useBoard.getState();
@@ -295,7 +302,13 @@ export function BoardStage({ model, stageRef: externalStageRef, sizeRef: externa
       createObject: (type, init) => model.createObject(type, { ...init, pageId: s().pageId ?? '' }) ?? '',
       updateObject: (id, patch) => void model.updateObjects([{ id, patch }]),
       deleteObjects: (ids) => void model.deleteObjects(ids),
-      transact: (fn) => model.transact(fn),
+      transact: (fn, opts) => model.transact(fn, opts),
+      canModify: (id) => model.canModify(id, 'props'),
+      canDelete: (id) => model.canDelete(id),
+      publishDrawing: (d) => {
+        const pageId = s().pageId;
+        presenceRef.current?.setDrawing(d && pageId ? { ...d, pageId, points: compactForPresence(d.points) } : null);
+      },
       hitTest: (pt, tol) =>
         model
           .hitTest(s().pageId ?? '', pt, tol)
@@ -539,7 +552,15 @@ export function BoardStage({ model, stageRef: externalStageRef, sizeRef: externa
       return;
     }
     if (it.kind === 'tool' && it.pointerId === e.pointerId) {
-      tool?.onPointerMove?.(toolEvent(e, world), toolCtx);
+      // Перо выдаёт точки чаще кадров: промежуточные (coalesced) события
+      // делают рукописную линию плавной. Инструментам с привязкой они не нужны.
+      const native = e.nativeEvent;
+      const coalesced = !tool?.snapping && typeof native.getCoalescedEvents === 'function' ? native.getCoalescedEvents() : [];
+      if (coalesced.length > 1) {
+        for (const ce of coalesced) {
+          tool?.onPointerMove?.(toolEventWith(ce as unknown as React.PointerEvent, toWorld(screenPoint(ce)), null), toolCtx);
+        }
+      } else tool?.onPointerMove?.(toolEvent(e, world), toolCtx);
       return;
     }
     if (it.kind === 'idle' && e.pointerType === 'mouse' && pageId) {
@@ -769,6 +790,18 @@ export function BoardStage({ model, stageRef: externalStageRef, sizeRef: externa
               dash={[6 / camera.zoom, 4 / camera.zoom]}
             />
           ))}
+          {peers.map((p) => {
+            // Недорисованные штрихи других участников.
+            const d = p.drawing;
+            if (!d || d.pageId !== pageId || d.points.length < 3) return null;
+            return (
+              <StrokeShape
+                key={`draw-${p.clientId}`}
+                props={{ points: d.points, width: d.width, opacity: d.opacity, pressure: d.tool === PEN_TOOL_ID }}
+                color={resolveColor(d.color, theme)}
+              />
+            );
+          })}
           {peers.map((p) => {
             if (!p.selection.length || !cursorVisible(p, caps?.role ?? 'viewer', settings?.showStudentCursors !== false)) return null;
             const onPage = p.selection.filter((id) => model.getObject(id)?.pageId === pageId);

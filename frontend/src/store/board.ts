@@ -7,11 +7,22 @@ import type { SnapResult } from '../canvas/snapping';
 export type ConnectionStatus = 'connecting' | 'online' | 'reconnecting' | 'offline' | 'closed';
 
 export interface ToolOptions {
+  /** Цвет линии фигур и пера. */
   stroke: string;
   fill: string;
   strokeWidth: number;
   dash: 'solid' | 'dashed' | 'dotted';
   shapeKind: ShapeKind;
+  /** Толщина пера на экране (пт); в документ пишется в мировых единицах. */
+  penWidth: number;
+  /** Распознавать фигуры: задержать перо в конце штриха. */
+  recognizeShapes: boolean;
+  markerColor: string;
+  markerWidth: number;
+  /** Ластик: целые объекты или части штрихов. */
+  eraserMode: 'stroke' | 'pixel';
+  /** Диаметр ластика на экране (пт). */
+  eraserSize: number;
 }
 
 export interface BoardInfo {
@@ -93,7 +104,19 @@ interface BoardState {
 const TOOL_OPTIONS_KEY = 'doska.toolOptions';
 
 function loadToolOptions(): ToolOptions {
-  const def: ToolOptions = { stroke: 'ink', fill: 'none', strokeWidth: 2, dash: 'solid', shapeKind: 'rect' };
+  const def: ToolOptions = {
+    stroke: 'ink',
+    fill: 'none',
+    strokeWidth: 2,
+    dash: 'solid',
+    shapeKind: 'rect',
+    penWidth: 3,
+    recognizeShapes: true,
+    markerColor: 'accent-7',
+    markerWidth: 16,
+    eraserMode: 'stroke',
+    eraserSize: 20,
+  };
   try {
     const raw = JSON.parse(localStorage.getItem(TOOL_OPTIONS_KEY) ?? '{}') as Partial<ToolOptions>;
     return { ...def, ...raw };

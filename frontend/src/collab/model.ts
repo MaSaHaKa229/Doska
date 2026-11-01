@@ -114,8 +114,9 @@ export class BoardModel {
       zoom: 1,
       theme: 'light',
     };
-    for (const id of this.objectsMap.keys()) this.reparse(id);
-    for (const id of this.objectsMap.keys()) this.updateBounds(id);
+    // Уже имеющиеся объекты (документ из снимка или IndexedDB): разбор,
+    // состав страниц, группы и габариты — так же, как при изменениях.
+    this.applyChanges(new Set(this.objectsMap.keys()));
 
     this.objectsMap.observeDeep((events) => {
       const changed = new Set<string>();
@@ -499,6 +500,14 @@ export class BoardModel {
   }
 
   /** z-ключ над самым верхним объектом слоя страницы. */
+  private bottomZ(pageId: string, layer: ObjectLayer): string | null {
+    for (const id of this.pageObjects(pageId)) {
+      const o = this.entries.get(id)!.obj;
+      if (o.layer === layer) return o.z;
+    }
+    return null;
+  }
+
   private topZ(pageId: string, layer: ObjectLayer): string | null {
     const ids = this.pageObjects(pageId);
     for (let i = ids.length - 1; i >= 0; i--) {
@@ -510,7 +519,21 @@ export class BoardModel {
 
   createObject<P>(
     type: string,
-    init: { pageId: string; x: number; y: number; props: P; deps?: string[]; layer?: ObjectLayer; groupId?: string | null; z?: string },
+    init: {
+      pageId: string;
+      x: number;
+      y: number;
+      props: P;
+      deps?: string[];
+      layer?: ObjectLayer;
+      groupId?: string | null;
+      z?: string;
+      /** 'bottom' — под остальными объектами слоя (маркер). */
+      placement?: 'top' | 'bottom';
+      rotation?: number;
+      scaleX?: number;
+      scaleY?: number;
+    },
   ): string | null {
     const layer = init.layer ?? this.opts.defaultLayer?.() ?? 'content';
     if (!this.canCreateOn(init.pageId, layer)) return null;
@@ -521,7 +544,11 @@ export class BoardModel {
       id,
       type,
       pageId: init.pageId,
-      z: init.z ?? generateKeyBetween(this.topZ(init.pageId, layer), null),
+      z:
+        init.z ??
+        (init.placement === 'bottom'
+          ? generateKeyBetween(null, this.bottomZ(init.pageId, layer))
+          : generateKeyBetween(this.topZ(init.pageId, layer), null)),
       userId: this.opts.userId,
       now: Date.now(),
       v: module?.version ?? 1,
@@ -529,7 +556,15 @@ export class BoardModel {
       x: init.x,
       y: init.y,
     });
-    const full = { ...base, deps: init.deps ?? [], groupId: init.groupId ?? null, props: init.props as Record<string, JsonValue> };
+    const full = {
+      ...base,
+      rotation: init.rotation ?? base.rotation,
+      scaleX: init.scaleX ?? base.scaleX,
+      scaleY: init.scaleY ?? base.scaleY,
+      deps: init.deps ?? [],
+      groupId: init.groupId ?? null,
+      props: init.props as Record<string, JsonValue>,
+    };
     const record = module ? module.serialize(full as BoardObject) : full;
     this.transact(() => {
       this.objectsMap.set(id, new Y.Map(Object.entries(record)));

@@ -3,17 +3,19 @@ import { PluginRegistry, type BoardPlugin } from '@doska/shared';
 import { shapeModule } from '../objects/shape';
 import { groupModule } from '../objects/group';
 import { handTool, laserTool, selectTool, shapeTool } from '../tools/shape-tools';
+import { eraserTool, markerTool, penTool } from '../tools/draw-tools';
+import { strokeModule } from '../objects/stroke/stroke';
 
 /**
- * Базовый плагин ядра: выделение, рука, группа и фигуры.
- * Инструменты рисования, текст, картинки и формулы добавляются на этапе 5,
+ * Базовый плагин ядра: выделение, рука, лазер, перо, маркер, ластик,
+ * группа, фигуры и рукописные штрихи. Текст, картинки и формулы — этапы 5.2–5.3,
  * разделы математики и физики — плагинами в src/math и src/physics.
  */
 export const corePlugin: BoardPlugin<ReactNode> = {
   id: 'core',
   title: 'Основные',
-  objects: [shapeModule, groupModule],
-  tools: [selectTool, handTool, laserTool, ...(['rect', 'ellipse', 'triangle', 'line', 'arrow'] as const).map(shapeTool)],
+  objects: [shapeModule, groupModule, strokeModule],
+  tools: [selectTool, handTool, laserTool, penTool, markerTool, eraserTool, ...(['rect', 'ellipse', 'triangle', 'line', 'arrow'] as const).map(shapeTool)],
 };
 
 /**

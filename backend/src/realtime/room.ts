@@ -454,7 +454,12 @@ export class Room {
     }
   }
 
+  /** Комната выгружена: повторная выгрузка и запись не выполняются. */
+  destroyed = false;
+
   async destroy(): Promise<void> {
+    if (this.destroyed) return;
+    this.destroyed = true;
     this.lesson.destroy();
     await this.lesson.idle();
     await this.persistence.close();

@@ -33,7 +33,7 @@ interface World {
 }
 
 async function world(): Promise<World> {
-  await resetDb();
+  await resetDb(testPrisma(), app);
   const t = await createUser({ login: 'teacher', password: 'kot12345', role: 'TEACHER', fullName: 'Учитель Физики' });
   const s = await createUser({ login: 'student', password: 'kot12345', role: 'STUDENT', fullName: 'Иванов Иван' });
   await createUser({ login: 'outsider', password: 'kot12345', role: 'STUDENT', fullName: 'Посторонний' });

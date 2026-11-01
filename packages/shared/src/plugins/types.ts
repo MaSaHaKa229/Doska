@@ -1,6 +1,6 @@
 import type { z } from 'zod';
 import type { Point, Rect } from '../board/geometry.js';
-import type { BoardObject, ObjectPatch } from '../board/object.js';
+import type { BoardObject, ObjectLayer, ObjectPatch } from '../board/object.js';
 import type { JsonValue } from '../board/json.js';
 
 /**
@@ -239,11 +239,42 @@ export interface ToolContext {
   readonly pageId: string;
   readonly canWrite: boolean;
   resolve: ResolveContext;
-  createObject<P>(type: string, init: { x: number; y: number; props: P; deps?: string[] }): string;
+  /**
+   * Создать объект на текущей странице. placement: 'bottom' — под остальными
+   * объектами слоя (маркер ложится под рисунок); по умолчанию — поверх.
+   * Возвращает id или '' (нет права).
+   */
+  createObject<P>(
+    type: string,
+    init: {
+      x: number;
+      y: number;
+      props: P;
+      deps?: string[];
+      placement?: 'top' | 'bottom';
+      layer?: ObjectLayer;
+      /** Поворот (рад) и масштаб сразу при создании: в той же транзакции объект ещё не изменить. */
+      rotation?: number;
+      scaleX?: number;
+      scaleY?: number;
+    },
+  ): string;
   updateObject<P>(id: string, patch: ObjectPatch<P>): void;
   deleteObjects(ids: string[]): void;
-  /** Транзакция: несколько изменений = один шаг отмены. */
-  transact(fn: () => void): void;
+  /**
+   * Транзакция: несколько изменений = один шаг отмены. merge: true —
+   * продолжение того же жеста (ластик ведётся по доске): склеивается с
+   * предыдущим шагом.
+   */
+  transact(fn: () => void, opts?: { merge?: boolean }): void;
+  /** Можно ли изменить / удалить объект (предварительная проверка прав). */
+  canModify(id: string): boolean;
+  canDelete(id: string): boolean;
+  /**
+   * Недорисованный штрих — другие участники видят его во время рисования
+   * (awareness.drawing; страницу подставляет ядро). null — штриха нет.
+   */
+  publishDrawing(drawing: { tool: string; color: string; width: number; opacity: number; points: number[] } | null): void;
   hitTest(point: Point, tolerance: number): BoardObject[];
   setSelection(ids: string[]): void;
   /** Предпросмотр (рисуется в оверлее и транслируется в awareness.drawing). */
