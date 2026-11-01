@@ -310,3 +310,232 @@
     flex: none;
   }
 }
+
+/* ---------- Доска ---------- */
+.board-page {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  grid-template-rows: auto auto minmax(0, 1fr) auto;
+  background: var(--bg);
+}
+.board-topbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 48px;
+  padding: 0 10px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  min-width: 0;
+}
+.board-topbar__title {
+  font-size: 1rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+.board-props {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-height: 46px;
+  padding: 4px 12px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  overflow-x: auto;
+}
+.board-props--empty {
+  justify-content: flex-start;
+}
+.board-props__title {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.prop {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+.prop__label {
+  font-size: 0.82rem;
+  color: var(--text-3);
+}
+.select--small,
+.input--small {
+  min-height: 32px;
+  padding: 4px 8px;
+  width: auto;
+}
+.swatches--small {
+  flex-wrap: nowrap;
+  gap: 4px;
+}
+.swatches--small .swatch {
+  width: 22px;
+  height: 22px;
+}
+.swatch--none {
+  background:
+    linear-gradient(45deg, transparent 45%, var(--danger) 45%, var(--danger) 55%, transparent 55%),
+    var(--surface);
+  border: 1px solid var(--border-strong);
+}
+.board-main {
+  position: relative;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  min-height: 0;
+}
+.board-toolbar {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 8px 6px;
+  background: var(--surface);
+  border-right: 1px solid var(--border);
+  overflow-y: auto;
+}
+.board-toolbar__group {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border);
+}
+.board-toolbar__group:last-child {
+  border-bottom: 0;
+}
+.tool-btn {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border: 0;
+  border-radius: var(--radius);
+  background: none;
+  color: var(--text-2);
+  cursor: pointer;
+}
+.tool-btn:hover:not(:disabled) {
+  background: var(--surface-2);
+}
+.tool-btn.active {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+.tool-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+.board-canvas-wrap {
+  position: relative;
+  min-width: 0;
+  min-height: 0;
+}
+.board-canvas {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.board-loading {
+  position: absolute;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 5;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: var(--surface);
+  box-shadow: var(--shadow-1);
+}
+.board-hint {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  font-size: 0.86rem;
+  background: var(--info-soft);
+  color: var(--info);
+}
+.board-banner {
+  padding: 8px 12px;
+  background: var(--surface);
+}
+.zoom-controls {
+  position: absolute;
+  right: 12px;
+  bottom: 12px;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 3px;
+  border-radius: var(--radius);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-1);
+}
+.zoom-controls__value {
+  min-width: 56px;
+  min-height: 32px;
+  border: 0;
+  background: none;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+}
+.page-tabs {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 44px;
+  padding: 4px 8px;
+  background: var(--surface);
+  border-top: 1px solid var(--border);
+  overflow-x: auto;
+}
+.page-tab {
+  display: inline-flex;
+  align-items: center;
+  flex: none;
+  border-radius: var(--radius-s);
+}
+.page-tab.active {
+  background: var(--accent-soft);
+}
+.page-tab.drop-target {
+  outline: 1px dashed var(--border-strong);
+}
+.page-tab__btn {
+  min-height: 34px;
+  padding: 0 12px;
+  border: 0;
+  background: none;
+  color: var(--text-2);
+  font-weight: 550;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.page-tab.active .page-tab__btn {
+  color: var(--accent);
+}
+.spin {
+  animation: spin 1s linear infinite;
+}
+@media (max-width: 640px) {
+  .tool-btn {
+    width: 40px;
+    height: 40px;
+  }
+}

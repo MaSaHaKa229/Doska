@@ -19,6 +19,9 @@ export default defineConfig({
   },
   test: {
     environment: 'jsdom',
+    // В тестах берём браузерную сборку Konva (поле browser), а не
+    // node-сборку, которой нужен нативный пакет canvas.
+    alias: [{ find: /^konva$/, replacement: 'konva/lib/index.js' }],
     include: ['src/**/*.test.{ts,tsx}'],
   },
 });

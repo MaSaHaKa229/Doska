@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { Suspense, lazy, useEffect } from 'react';
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { useAuth } from '../store/auth';
 import { setHttpHooks } from '../api/http';
@@ -17,6 +17,8 @@ import { CredentialsPage } from '../pages/admin/CredentialsPage';
 import { ClassesPage } from '../pages/admin/ClassesPage';
 import { ClassPage } from '../pages/admin/ClassPage';
 import { AuditPage } from '../pages/admin/AuditPage';
+// Доска (Konva, Yjs) — отдельный чанк: вход и админка загружаются без неё.
+const BoardPage = lazy(() => import('../pages/board/BoardPage').then((m) => ({ default: m.BoardPage })));
 
 export function App() {
   const status = useAuth((s) => s.status);
@@ -40,6 +42,16 @@ export function App() {
           element={
             <RequireAuth allowPendingPassword>
               <ChangePasswordPage />
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/boards/:id"
+          element={
+            <RequireAuth>
+              <Suspense fallback={<FullScreenSpinner />}>
+                <BoardPage />
+              </Suspense>
             </RequireAuth>
           }
         />

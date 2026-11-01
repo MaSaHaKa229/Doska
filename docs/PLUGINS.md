@@ -109,7 +109,7 @@ frontend/src/physics/optics/
 └── optics.worker.ts     трассировка лучей (если нужна)
 ```
 
-Загрузчик ядра (`frontend/src/canvas/plugins/load.ts`) находит плагины через `import.meta.glob('/src/{objects,tools,math,physics}/**/plugin.ts')` и регистрирует их в порядке зависимостей.
+Реестр (`frontend/src/plugins/registry.ts`) сначала регистрирует базовый плагин `core` (выделение, рука, группа, фигуры), затем находит разделы через `import.meta.glob(['/src/math/**/plugin.ts', '/src/physics/**/plugin.ts'])` и регистрирует их в порядке зависимостей (`orderByDependencies`). Иконки инструментов задаются именем lucide-react; плагин добавляет свои иконки через `registerIcons` (`frontend/src/ui/icons.ts`).
 Каждый раздел попадает в отдельный чанк Vite, а тяжёлые разделы (3D) загружаются при первом использовании.
 Чтобы добавить раздел, достаточно **создать папку**: правки в ядре и регистрация вручную не нужны.
 

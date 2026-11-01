@@ -248,6 +248,10 @@ export interface ToolContext {
   setSelection(ids: string[]): void;
   /** Предпросмотр (рисуется в оверлее и транслируется в awareness.drawing). */
   setPreview(preview: unknown | null): void;
+  /** Текущий предпросмотр инструмента (для renderOverlay). */
+  getPreview<T>(): T | null;
+  /** Переводит экранное расстояние в мировое при текущем зуме (допуски, толщина ручек). */
+  screenToWorld(px: number): number;
   /** Переключиться на другой инструмент (например, обратно на выделение). */
   activateTool(id: string): void;
   /** Значения панели свойств инструмента (цвет, толщина). */

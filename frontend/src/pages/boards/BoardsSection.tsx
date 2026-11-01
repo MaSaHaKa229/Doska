@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import {
   Folder,
   FolderInput,
@@ -30,8 +31,7 @@ const PAGE_SIZE = 24;
  * Список досок на главной странице.
  *  - Учитель: свои доски с папками, поиском и созданием.
  *  - Ученик: доски, открытые учителем, и личные конспекты.
- * Холст доски открывается с этапа 3.2; до этого карточка показывает
- * свойства доски и действия над ней.
+ * Карточка открывает доску (/boards/:id).
  */
 export function BoardsSection({ user }: { user: Me }) {
   const isTeacher = user.role === 'TEACHER';
@@ -178,9 +178,9 @@ export function BoardsSection({ user }: { user: Me }) {
           <div className="board-grid">
             {list.data?.items.map((b) => (
               <article key={b.id} className="board-card">
-                <div className="board-card__thumb" aria-hidden>
+                <Link to={`/boards/${b.id}`} className="board-card__thumb" aria-hidden tabIndex={-1}>
                   <LayoutGrid size={28} />
-                </div>
+                </Link>
                 <div className="board-card__body">
                   <h3 className="board-card__title" title={b.title}>
                     {b.title}
@@ -203,9 +203,9 @@ export function BoardsSection({ user }: { user: Me }) {
                   </div>
                 </div>
                 <div className="board-card__actions">
-                  <Button size="small" disabled title="Холст доски подключается на этапе 3.2">
+                  <Link to={`/boards/${b.id}`} className="btn btn--small btn--primary">
                     Открыть
-                  </Button>
+                  </Link>
                   {b.role === 'owner' && (
                     <ActionMenu
                       label={`Действия с доской ${b.title}`}
