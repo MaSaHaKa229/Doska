@@ -1,3 +1,4 @@
+import type { ObjectStorage } from '../assets/storage.js';
 import type { PrismaClient, UserRole } from '@prisma/client';
 import type { preHandlerAsyncHookHandler } from 'fastify';
 import type { AppConfig } from '../config/env.js';
@@ -23,6 +24,8 @@ declare module 'fastify' {
   interface FastifyInstance {
     config: AppConfig;
     prisma: PrismaClient;
+    /** Хранилище файлов (MinIO / S3 или каталог на диске). */
+    storage: ObjectStorage;
     audit: AuditService;
     events: AppEvents;
     userStatus: UserStatusCache;

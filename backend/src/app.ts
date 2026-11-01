@@ -20,6 +20,8 @@ import { healthRoutes } from './health/health.routes.js';
 import { adminRoutes } from './admin/admin.routes.js';
 import { boardsRoutes } from './boards/boards.routes.js';
 import { assignmentsRoutes } from './assignments/assignments.routes.js';
+import { assetsRoutes } from './assets/assets.routes.js';
+import { createStorage } from './assets/storage.js';
 import { registerRealtime, type RealtimeOptions } from './realtime/server.js';
 
 export interface BuildAppOptions {
@@ -60,6 +62,9 @@ export async function buildApp({ config, prisma, extend, realtime }: BuildAppOpt
   app.decorate('tokens', tokens);
   app.decorate('userStatus', new UserStatusCache(db, events));
   app.decorate('authService', new AuthService(db, config, passwords, tokens, audit, events));
+  const storage = createStorage(config.storage);
+  await storage.init();
+  app.decorate('storage', storage);
 
   app.setErrorHandler(errorHandler);
   app.setNotFoundHandler(notFoundHandler);
@@ -76,6 +81,7 @@ export async function buildApp({ config, prisma, extend, realtime }: BuildAppOpt
   await app.register(adminRoutes, { prefix: '/api/admin' });
   await app.register(boardsRoutes, { prefix: '/api' });
   await app.register(assignmentsRoutes, { prefix: '/api' });
+  await app.register(assetsRoutes, { prefix: '/api' });
   registerRealtime(app, realtime);
 
   if (extend) await extend(app);

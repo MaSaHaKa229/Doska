@@ -769,25 +769,49 @@ export class BoardModel {
   // ------------------------------------------------------------------
 
   addPage(title?: string, afterPageId?: string): string | null {
-    if (!this.canEditPages()) return null;
+    return this.addPages([{ title }], afterPageId)[0] ?? null;
+  }
+
+  /**
+   * Несколько страниц подряд после afterPageId (по умолчанию — в конец)
+   * одной транзакцией — один шаг отмены. Фон — заданный или как у соседней
+   * страницы (страница PDF не копируется); закрепить фон может только учитель.
+   */
+  addPages(
+    specs: { title?: string; background?: Partial<Background>; backgroundLocked?: boolean }[],
+    afterPageId?: string,
+  ): string[] {
+    if (!this.canEditPages() || !specs.length) return [];
     const pages = this.pages();
-    if (pages.length >= LIMITS.maxPagesPerBoard) return null;
+    const room = LIMITS.maxPagesPerBoard - pages.length;
+    if (room <= 0) return [];
     const idx = afterPageId ? pages.findIndex((p) => p.id === afterPageId) : pages.length - 1;
-    const lo = pages[idx]?.order ?? null;
-    const hi = pages[idx + 1]?.order ?? null;
-    const id = newEntityId();
     const prev = pages[idx];
-    const page: PageRecord = {
-      id,
-      title: (title ?? `Страница ${pages.length + 1}`).slice(0, 100),
-      order: generateKeyBetween(lo, hi),
-      background: prev ? { ...prev.background } : { ...DEFAULT_BACKGROUND },
-      backgroundLocked: false,
-      createdBy: this.opts.userId,
-      createdAt: Date.now(),
-    };
-    this.transact(() => this.pagesMap.set(id, new Y.Map(Object.entries(page))));
-    return id;
+    const hi = pages[idx + 1]?.order ?? null;
+    let lo = prev?.order ?? null;
+    const base = prev ? { ...prev.background, pdf: null } : { ...DEFAULT_BACKGROUND };
+    const canLock = this.canEditPages('backgroundLocked');
+    const ids: string[] = [];
+    const now = Date.now();
+    this.transact(() => {
+      specs.slice(0, room).forEach((spec, i) => {
+        const id = newEntityId();
+        const order = generateKeyBetween(lo, hi);
+        lo = order;
+        const page: PageRecord = {
+          id,
+          title: (spec.title ?? `Страница ${pages.length + i + 1}`).slice(0, 100),
+          order,
+          background: { ...base, ...spec.background },
+          backgroundLocked: !!spec.backgroundLocked && canLock,
+          createdBy: this.opts.userId,
+          createdAt: now,
+        };
+        this.pagesMap.set(id, new Y.Map(Object.entries(page)));
+        ids.push(id);
+      });
+    });
+    return ids;
   }
 
   renamePage(id: string, title: string): void {

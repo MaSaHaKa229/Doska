@@ -1,3 +1,6 @@
+import { mkdtempSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { PrismaClient, type UserRole } from '@prisma/client';
 import type { FastifyInstance, LightMyRequestResponse } from 'fastify';
 import { AUTH_COOKIES, CSRF_HEADER } from '@doska/shared';
@@ -8,6 +11,9 @@ import { PasswordHasher } from '../src/auth/password.js';
 import { TEST_DATABASE_URL } from './global-setup.js';
 
 export const ORIGIN = 'https://doska.test';
+
+/** Каталог загрузок тестов (один на процесс). */
+export const TEST_UPLOADS_DIR = mkdtempSync(join(tmpdir(), 'doska-uploads-'));
 
 export function testConfig(overrides: Record<string, string> = {}): AppConfig {
   return loadConfig({
@@ -21,6 +27,8 @@ export function testConfig(overrides: Record<string, string> = {}): AppConfig {
     ARGON2_TIME_COST: '1',
     RATE_LIMIT_LOGIN_PER_MINUTE: '1000',
     RATE_LIMIT_AUTH_PER_MINUTE: '1000',
+    // Файлы тестов — во временном каталоге (хранилище на диске).
+    UPLOADS_DIR: TEST_UPLOADS_DIR,
     ...overrides,
   });
 }

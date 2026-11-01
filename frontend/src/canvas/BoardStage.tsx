@@ -14,6 +14,7 @@ import { findSnap, gridSnap, SNAP_LABELS, type SnapResult } from './snapping';
 import { resolveColor, SURFACE_COLORS, type CanvasTheme } from '../objects/colors';
 import { HAND_TOOL_ID, LASER_TOOL_ID, SELECT_TOOL_ID } from '../tools/shape-tools';
 import { toolUnavailable } from '../tools/availability';
+import { PdfBackground } from './PdfBackground';
 import { StrokeShape } from '../objects/stroke/stroke';
 import { compactForPresence } from '../objects/stroke/geometry';
 import { PEN_TOOL_ID } from '../tools/draw-tools';
@@ -757,6 +758,7 @@ export function BoardStage({ model, stageRef: externalStageRef, sizeRef: externa
               }}
             />
           )}
+          {page?.background.pdf && <PdfBackground pdf={page.background.pdf} camera={camera} size={size} />}
         </Layer>
         <Layer>
           {visibleIds.map((id) => (

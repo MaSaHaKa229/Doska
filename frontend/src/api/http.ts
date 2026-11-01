@@ -96,6 +96,8 @@ export function refreshSession(): Promise<boolean> {
 
 export interface RequestOptions {
   body?: unknown;
+  /** Тело как есть (файл) вместо JSON. */
+  raw?: { data: Blob; contentType: string; headers?: Record<string, string> };
   query?: Record<string, string | number | boolean | undefined | null | string[]>;
   signal?: AbortSignal;
 }
@@ -133,7 +135,8 @@ export async function request<T>(method: string, path: string, opts: RequestOpti
   for (;;) {
     if (unsafe) await ensureCsrf();
     const headers: Record<string, string> = { accept: 'application/json' };
-    if (opts.body !== undefined) headers['content-type'] = 'application/json';
+    if (opts.raw) Object.assign(headers, opts.raw.headers, { 'content-type': opts.raw.contentType });
+    else if (opts.body !== undefined) headers['content-type'] = 'application/json';
     if (unsafe) headers[CSRF_HEADER] = readCookie(AUTH_COOKIES.csrf) ?? '';
 
     let res: Response;
@@ -142,7 +145,7 @@ export async function request<T>(method: string, path: string, opts: RequestOpti
         method,
         headers,
         credentials: 'same-origin',
-        body: opts.body !== undefined ? JSON.stringify(opts.body) : undefined,
+        body: opts.raw ? opts.raw.data : opts.body !== undefined ? JSON.stringify(opts.body) : undefined,
         signal: opts.signal,
       });
     } catch (err) {

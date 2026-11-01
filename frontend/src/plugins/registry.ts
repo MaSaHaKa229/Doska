@@ -5,6 +5,8 @@ import { groupModule } from '../objects/group';
 import { handTool, laserTool, selectTool, shapeTool } from '../tools/shape-tools';
 import { eraserTool, markerTool, penTool } from '../tools/draw-tools';
 import { strokeModule } from '../objects/stroke/stroke';
+import { imageModule } from '../objects/image';
+import { mediaTool } from '../tools/media-tool';
 
 /**
  * Базовый плагин ядра: выделение, рука, лазер, перо, маркер, ластик,
@@ -14,8 +16,8 @@ import { strokeModule } from '../objects/stroke/stroke';
 export const corePlugin: BoardPlugin<ReactNode> = {
   id: 'core',
   title: 'Основные',
-  objects: [shapeModule, groupModule, strokeModule],
-  tools: [selectTool, handTool, laserTool, penTool, markerTool, eraserTool, ...(['rect', 'ellipse', 'triangle', 'line', 'arrow'] as const).map(shapeTool)],
+  objects: [shapeModule, groupModule, strokeModule, imageModule],
+  tools: [selectTool, handTool, laserTool, penTool, markerTool, eraserTool, ...(['rect', 'ellipse', 'triangle', 'line', 'arrow'] as const).map(shapeTool), mediaTool],
 };
 
 /**

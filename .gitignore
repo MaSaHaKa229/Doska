@@ -12,3 +12,7 @@ coverage/
 .vscode/*
 !.vscode/extensions.json
 /backups/
+
+# Загруженные файлы при хранении на диске (UPLOADS_DIR)
+/data/
+/backend/data/

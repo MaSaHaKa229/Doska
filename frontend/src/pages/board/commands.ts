@@ -1,4 +1,6 @@
-import type { SerializedBoardObject } from '@doska/shared';
+import { noWriteHint, type AssetView, type Point, type SerializedBoardObject } from '@doska/shared';
+import { imageDisplaySize, uploadFile } from '../../media/insert';
+import { IMAGE_TYPE, type ImageProps } from '../../objects/image';
 import type { BoardModel } from '../../collab/model';
 import { useBoard, currentCamera } from '../../store/board';
 import { fitRect, viewportRect, zoomAt, type Size } from '../../canvas/camera';
@@ -16,6 +18,8 @@ export const ZOOM_STEPS = [0.05, 0.1, 0.25, 0.5, 0.75, 1, 1.25, 1.5, 2, 3, 4, 6,
 export class BoardCommands {
   private pasteCount = 0;
   private lastPasted = '';
+  /** Диалог импорта PDF (задаёт страница доски). */
+  pdfHandler: ((asset: AssetView, name: string) => void) | null = null;
 
   constructor(
     private readonly model: BoardModel,
@@ -156,6 +160,50 @@ export class BoardCommands {
     const id = this.model.createObject(objectType, { pageId, x: cam.cx, y: cam.cy, props: full });
     if (id) this.store.setSelection([id]);
     else toast.info('Нет права добавлять объекты на эту страницу');
+  }
+
+  /**
+   * Вставить файлы (буфер обмена, перетаскивание, выбор файла): картинки —
+   * объектами в точке at (по умолчанию в центре экрана) лесенкой, PDF —
+   * через диалог импорта страниц.
+   */
+  async insertFiles(files: File[], at: Point | null = null): Promise<void> {
+    const s = this.store;
+    const boardId = s.board?.id;
+    if (!boardId || !s.pageId || !files.length) return;
+    if (!s.caps?.write) {
+      toast.info(noWriteHint(s.caps?.noWriteReason ?? 'read-only') ?? 'Нет права записи');
+      return;
+    }
+    const cam = currentCamera();
+    const center = at ?? { x: cam.cx, y: cam.cy };
+    const view = viewportRect(cam, this.size());
+    const max = Math.min(view.width, view.height) * 0.6;
+    const created: string[] = [];
+    const busy = files.length > 1 ? `Загрузка файлов: ${files.length}…` : `Загрузка «${files[0]!.name}»…`;
+    toast.info(busy);
+    for (const [i, file] of files.entries()) {
+      const r = await uploadFile(boardId, file);
+      if (!r) continue;
+      if (r.kind === 'pdf') {
+        this.pdfHandler?.(r.asset, r.name);
+        continue;
+      }
+      const pageId = this.store.pageId;
+      if (!pageId) return;
+      const { asset } = r;
+      const { w, h } = imageDisplaySize(asset.width ?? 100, asset.height ?? 100, cam.zoom, max);
+      const shift = (i * 24) / cam.zoom;
+      const id = this.model.createObject<ImageProps>(IMAGE_TYPE, {
+        pageId,
+        x: center.x - w / 2 + shift,
+        y: center.y - h / 2 + shift,
+        props: { assetId: asset.id, w, h, naturalW: asset.width ?? 100, naturalH: asset.height ?? 100, crop: null, alt: asset.originalName ?? undefined },
+      });
+      if (id) created.push(id);
+      else toast.info('Нет права добавлять объекты на эту страницу');
+    }
+    if (created.length) this.store.setSelection(created);
   }
 
   gotoPage(delta: 1 | -1): void {

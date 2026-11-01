@@ -58,6 +58,20 @@ const envSchema = z.object({
   RATE_LIMIT_LOGIN_PER_MINUTE: int(10, 1, 10_000),
   /** Прочих запросов к /api/auth в минуту с одного IP. */
   RATE_LIMIT_AUTH_PER_MINUTE: int(60, 1, 100_000),
+
+  /**
+   * Хранилище файлов. Задан S3_ENDPOINT — S3-совместимое (MinIO); пусто —
+   * каталог UPLOADS_DIR на диске (разработка, тесты, установка на один сервер).
+   */
+  S3_ENDPOINT: z.string().default(''),
+  S3_REGION: z.string().default('us-east-1'),
+  S3_BUCKET: z.string().default('doska'),
+  S3_ACCESS_KEY: z.string().default(''),
+  S3_SECRET_KEY: z.string().default(''),
+  UPLOADS_DIR: z.string().default('./data/uploads'),
+  /** Предельный размер загружаемой картинки и PDF, МБ. */
+  UPLOAD_MAX_IMAGE_MB: int(15, 1, 200),
+  UPLOAD_MAX_PDF_MB: int(50, 1, 500),
 });
 
 export type RawEnv = z.input<typeof envSchema>;
@@ -75,6 +89,10 @@ export interface AppConfig {
   argon2: { memoryCost: number; timeCost: number };
   login: { maxFailures: number; lockMinutes: number };
   rateLimit: { loginPerMinute: number; authPerMinute: number };
+  storage:
+    | { driver: 's3'; endpoint: string; region: string; bucket: string; accessKey: string; secretKey: string }
+    | { driver: 'fs'; dir: string };
+  uploads: { maxImageBytes: number; maxPdfBytes: number };
 }
 
 export class ConfigError extends Error {}
@@ -93,6 +111,14 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
       throw new ConfigError(`Ошибка конфигурации: PUBLIC_ORIGIN содержит неверный адрес «${origin}»`);
     }
   }
+  if (e.S3_ENDPOINT) {
+    try {
+      new URL(e.S3_ENDPOINT);
+    } catch {
+      throw new ConfigError(`Ошибка конфигурации: S3_ENDPOINT — неверный адрес «${e.S3_ENDPOINT}»`);
+    }
+    if (!e.S3_ACCESS_KEY || !e.S3_SECRET_KEY) throw new ConfigError('Ошибка конфигурации: для S3_ENDPOINT нужны S3_ACCESS_KEY и S3_SECRET_KEY');
+  }
   return {
     nodeEnv: e.NODE_ENV,
     host: e.HOST,
@@ -110,5 +136,9 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
     argon2: { memoryCost: e.ARGON2_MEMORY_KIB, timeCost: e.ARGON2_TIME_COST },
     login: { maxFailures: e.LOGIN_MAX_FAILURES, lockMinutes: e.LOGIN_LOCK_MINUTES },
     rateLimit: { loginPerMinute: e.RATE_LIMIT_LOGIN_PER_MINUTE, authPerMinute: e.RATE_LIMIT_AUTH_PER_MINUTE },
+    storage: e.S3_ENDPOINT
+      ? { driver: 's3', endpoint: e.S3_ENDPOINT, region: e.S3_REGION, bucket: e.S3_BUCKET, accessKey: e.S3_ACCESS_KEY, secretKey: e.S3_SECRET_KEY }
+      : { driver: 'fs', dir: e.UPLOADS_DIR },
+    uploads: { maxImageBytes: e.UPLOAD_MAX_IMAGE_MB * 1024 * 1024, maxPdfBytes: e.UPLOAD_MAX_PDF_MB * 1024 * 1024 },
   };
 }

@@ -5,6 +5,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Copy,
+  Crop,
   Group as GroupIcon,
   Lock,
   Maximize,
@@ -35,6 +36,7 @@ import { ConfirmDialog } from '../../ui/ConfirmDialog';
 import { Checkbox, SelectField, TextField } from '../../ui/Field';
 import { ActionMenu } from '../../ui/Menu';
 import { InspectorFieldView } from './InspectorFields';
+import { CropDialog } from './MediaUi';
 import type { BoardCommands } from './commands';
 import type { CanvasTheme } from '../../objects/colors';
 import { toast } from '../../store/toast';
@@ -99,6 +101,7 @@ export function PropertiesBar({ model, commands, theme }: { model: BoardModel; c
   const setToolOptions = useBoard((s) => s.setToolOptions);
   const caps = useBoard((s) => s.caps);
   const pageId = useBoard((s) => s.pageId);
+  const [cropping, setCropping] = useState<string | null>(null);
   // Перерисовка при изменении выделенных объектов.
   useSyncExternalStore(
     useCallback((cb) => (pageId ? model.subscribePage(pageId, cb) : () => undefined), [model, pageId]),
@@ -119,6 +122,8 @@ export function PropertiesBar({ model, commands, theme }: { model: BoardModel; c
   const canEdit = leaves.length > 0 && leaves.every((id) => model.canModify(id, 'props'));
   const anyLocked = leaves.some((id) => model.getObject(id)?.locked);
   const hasGroup = selection.some((id) => model.getObject(id)?.type === 'core.group');
+  // Объект с редактором «обрезка» (картинка) — кнопка «Обрезать».
+  const cropTarget = leaves.length === 1 && entries[0]?.module?.editor === 'crop' ? leaves[0]! : null;
 
   if (selection.length === 0 && tool?.options?.length) {
     return (
@@ -156,6 +161,12 @@ export function PropertiesBar({ model, commands, theme }: { model: BoardModel; c
           onChange={(v) => model.updateObjects(leaves.map((id) => ({ id, patch: { props: { [f.key]: v } } })))}
         />
       ))}
+      {cropTarget && (
+        <Button size="small" variant="ghost" icon={<Crop size={16} />} disabled={!canEdit} onClick={() => setCropping(cropTarget)}>
+          Обрезать
+        </Button>
+      )}
+      <CropDialog model={model} objectId={cropping} onClose={() => setCropping(null)} />
       <div className="spacer" />
       <div className="row" style={{ gap: 2, flexWrap: 'nowrap' }}>
         <Button size="small" variant="ghost" iconOnly icon={<Copy size={16} />} title="Дублировать (Ctrl+D)" aria-label="Дублировать" disabled={!caps?.write} onClick={() => commands.duplicate()} />

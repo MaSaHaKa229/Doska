@@ -18,3 +18,4 @@ export * from './api/csv.js';
 export * from './api/admin.js';
 export * from './api/boards.js';
 export * from './api/assignments.js';
+export * from './api/assets.js';

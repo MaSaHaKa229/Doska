@@ -19,6 +19,8 @@ export const API_ERROR_CODES = [
   'NOT_FOUND',
   'CONFLICT',
   'PAYLOAD_TOO_LARGE',
+  /** Файл не прошёл проверку (не картинка/PDF, повреждён, слишком большой по размерам). */
+  'FILE_REJECTED',
   'SERVICE_UNAVAILABLE',
   'INTERNAL',
 ] as const;

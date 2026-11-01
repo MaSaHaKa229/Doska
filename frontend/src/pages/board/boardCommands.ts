@@ -1,6 +1,7 @@
 import type { BoardModel } from '../../collab/model';
 import type { BoardCommands } from './commands';
 import { useBoard } from '../../store/board';
+import { pickFiles } from '../../media/insert';
 
 /** Команда доски для палитры Ctrl+K и справки. */
 export interface PaletteCommand {
@@ -30,6 +31,15 @@ export function coreCommands(commands: BoardCommands, model: BoardModel, extra: 
     { id: 'back', title: 'На задний план', keywords: ['слой', 'под', 'вниз'], hotkey: 'Ctrl+Shift+[', section: 'Упорядочить', enabled: hasSel, run: () => commands.reorder('back') },
     { id: 'forward', title: 'Вперёд на один слой', keywords: ['слой', 'выше'], hotkey: 'Ctrl+]', section: 'Упорядочить', enabled: hasSel, run: () => commands.reorder('forward') },
     { id: 'backward', title: 'Назад на один слой', keywords: ['слой', 'ниже'], hotkey: 'Ctrl+[', section: 'Упорядочить', enabled: hasSel, run: () => commands.reorder('backward') },
+    {
+      id: 'insert-media',
+      title: 'Вставить картинку или PDF…',
+      keywords: ['картинка', 'изображение', 'фото', 'pdf', 'файл', 'загрузить'],
+      hotkey: 'Ctrl+V',
+      section: 'Вставка',
+      enabled: canWrite,
+      run: () => void pickFiles().then((files) => commands.insertFiles(files)),
+    },
     { id: 'lock', title: 'Заблокировать / разблокировать', keywords: ['замок', 'закрепить', 'блокировка'], hotkey: 'Ctrl+L', section: 'Упорядочить', enabled: () => hasSel() && !!st().caps?.moderate, run: () => commands.toggleLock() },
     { id: 'zoom-in', title: 'Увеличить', keywords: ['масштаб', 'приблизить', 'зум'], hotkey: 'Ctrl+=', section: 'Вид', enabled: () => true, run: () => commands.zoomStep(1) },
     { id: 'zoom-out', title: 'Уменьшить', keywords: ['масштаб', 'отдалить', 'зум'], hotkey: 'Ctrl+−', section: 'Вид', enabled: () => true, run: () => commands.zoomStep(-1) },

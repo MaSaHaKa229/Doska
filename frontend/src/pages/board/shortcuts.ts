@@ -107,9 +107,18 @@ export function useBoardShortcuts(commands: BoardCommands | null, ui: { palette:
     const onPaste = (e: ClipboardEvent) => {
       if (isTyping(e.target)) return;
       const objects = decodeClipboard(e.clipboardData?.getData('text/plain'));
-      if (!objects) return; // картинки и текст из буфера — этап 5.2
-      e.preventDefault();
-      commands.paste(objects);
+      if (objects) {
+        e.preventDefault();
+        commands.paste(objects);
+        return;
+      }
+      // Картинки и PDF из буфера (снимок экрана, скопированный файл).
+      const files = [...(e.clipboardData?.files ?? [])].filter((f) => f.type.startsWith('image/') || f.type === 'application/pdf');
+      if (files.length) {
+        e.preventDefault();
+        void commands.insertFiles(files);
+      }
+      // Текст из буфера — этап 5.2b (текстовые блоки).
     };
 
     window.addEventListener('keydown', onKeyDown);

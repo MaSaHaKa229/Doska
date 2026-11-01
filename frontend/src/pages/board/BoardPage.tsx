@@ -1,15 +1,15 @@
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore, useCallback } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { ArrowLeft, CloudOff, Loader2, Lock, Redo2, Search, Undo2, Wifi } from 'lucide-react';
-import { BOARD_MODE_LABELS, noWriteHint, type BoardDetails } from '@doska/shared';
+import { BOARD_MODE_LABELS, noWriteHint, type AssetView, type BoardDetails } from '@doska/shared';
 import type Konva from 'konva';
 import { boardsApi } from '../../api/boards';
 import { ApiError, errorMessage } from '../../api/http';
 import { useAuth } from '../../store/auth';
-import { useBoard, type ConnectionStatus } from '../../store/board';
+import { currentCamera, useBoard, type ConnectionStatus } from '../../store/board';
 import { openBoardSession, type BoardSession } from '../../collab/session';
 import { BoardStage } from '../../canvas/BoardStage';
-import { fitRect, type Size } from '../../canvas/camera';
+import { fitRect, screenToWorld, type Size } from '../../canvas/camera';
 import { Button } from '../../ui/Button';
 import { Alert, Badge, EmptyState, FullScreenSpinner } from '../../ui/misc';
 import { BoardCommands } from './commands';
@@ -21,6 +21,9 @@ import { ViewMenu } from './ViewMenu';
 import { FollowBanner, HandButton, HandsIndicator, LessonMenu } from './LessonUi';
 import { LaserLayer } from './LaserLayer';
 import { WorkBar } from './WorkBar';
+import { PdfImportDialog } from './MediaUi';
+import { INSERT_FILES_EVENT, type InsertFilesDetail } from '../../media/insert';
+import { toast } from '../../store/toast';
 import { useFollowLead, useFollowView } from './useFollow';
 import { CommandPalette, HelpDialog } from './Palette';
 import { coreCommands } from './boardCommands';
@@ -133,6 +136,26 @@ function BoardWorkspace({ session }: { session: BoardSession }) {
   const paletteCommands = useMemo(() => coreCommands(commands, model, { help: ui.help }), [commands, model, ui]);
   const pendingChanges = useBoard((s) => s.pendingChanges);
   useBoardShortcuts(commands, ui);
+  // Картинки и PDF: импорт PDF — через диалог; файлы от инструмента «Картинка или PDF».
+  const [pdfRequest, setPdfRequest] = useState<{ asset: AssetView; name: string } | null>(null);
+  useEffect(() => {
+    commands.pdfHandler = (asset, name) => {
+      if (!useBoard.getState().caps?.managePages) {
+        toast.info('PDF добавляется новыми страницами, а добавлять страницы на этой доске может учитель');
+        return;
+      }
+      setPdfRequest({ asset, name });
+    };
+    const onInsert = (e: Event) => {
+      const { files, at } = (e as CustomEvent<InsertFilesDetail>).detail;
+      void commands.insertFiles(files, at);
+    };
+    window.addEventListener(INSERT_FILES_EVENT, onInsert);
+    return () => {
+      commands.pdfHandler = null;
+      window.removeEventListener(INSERT_FILES_EVENT, onInsert);
+    };
+  }, [commands]);
   useFollowView(model, sizeRef);
   useFollowLead(session, sizeRef);
 
@@ -155,7 +178,9 @@ function BoardWorkspace({ session }: { session: BoardSession }) {
     if (!pageId || !synced) return;
     const s = useBoard.getState();
     if (s.cameras[pageId]) return;
-    const bounds = model.pageBounds(pageId);
+    // Страница PDF — показать её целиком, если объектов нет.
+    const pdf = model.page(pageId)?.background.pdf;
+    const bounds = model.pageBounds(pageId) ?? (pdf ? { x: 0, y: 0, width: pdf.width, height: pdf.height } : null);
     s.setCamera(bounds ? fitRect(bounds, sizeRef.current, 64, 1) : { cx: 0, cy: 0, zoom: 1 }, 'system');
   }, [model, pageId, synced]);
 
@@ -216,7 +241,22 @@ function BoardWorkspace({ session }: { session: BoardSession }) {
       </div>
       <div className="board-main">
         <Toolbar />
-        <div className="board-canvas-wrap">
+        <div
+          className="board-canvas-wrap"
+          onDragOver={(e) => {
+            if (e.dataTransfer.types.includes('Files')) {
+              e.preventDefault();
+              e.dataTransfer.dropEffect = 'copy';
+            }
+          }}
+          onDrop={(e) => {
+            const files = [...e.dataTransfer.files];
+            if (!files.length) return;
+            e.preventDefault();
+            const r = e.currentTarget.getBoundingClientRect();
+            void commands.insertFiles(files, screenToWorld(currentCamera(), sizeRef.current, { x: e.clientX - r.left, y: e.clientY - r.top }));
+          }}
+        >
           {!synced && (
             <div className="board-loading">
               <Loader2 size={20} className="spin" /> Загрузка доски…
@@ -235,6 +275,7 @@ function BoardWorkspace({ session }: { session: BoardSession }) {
         commands={paletteCommands}
         onInsert={(type, props) => commands.insertAtCenter(type, props)}
       />
+      <PdfImportDialog model={model} request={pdfRequest} onClose={() => setPdfRequest(null)} />
       <HelpDialog open={helpOpen} onClose={() => setHelpOpen(false)} commands={paletteCommands} />
     </div>
   );
