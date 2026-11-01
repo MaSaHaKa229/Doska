@@ -15,7 +15,7 @@
 
 ## 2. Что сделано
 
-Ветка `stage-1-architecture`; последний коммит кода — этап 4.1 (сообщение «Этап 4.1: …», хеш — `git log --grep 'Этап 4.1'`). Ветка `main` указывает на коммит этапа 1 (`21e5b4a`). Открыт пулл-реквест #1 `stage-1-architecture` → `main`.
+Ветка `stage-1-architecture`; последний коммит кода — `5c1abc8` (этап 4.1), затем коммит с `HANDOFF.md`. Ветка `main` указывает на коммит этапа 1 (`21e5b4a`). Открыт пулл-реквест #1 `stage-1-architecture` → `main`.
 
 | Этап | Коммит | Основные файлы |
 |---|---|---|
@@ -26,7 +26,7 @@
 | 3.1. Доски, папки, сервер реального времени | 01efee1 | `backend/src/boards/`, `backend/src/realtime/{guard,room,server,persistence,connection,doc,rate-limit}.ts`, `frontend/src/pages/boards/` |
 | 3.2. Ядро холста | f268dd7 | `frontend/src/{collab,canvas,objects,tools,plugins}/`, `frontend/src/pages/board/` |
 | 3.3. Присутствие, офлайн, привязки, Ctrl+K, справка | 505e9f3 | `frontend/src/collab/{presence,people}.ts`, `frontend/src/canvas/snapping.ts`, `frontend/src/pages/board/{PresenceUi,ViewMenu,Palette,boardCommands}.tsx`, эндпоинт `GET /api/boards/:id/people` |
-| 4.1. Уроки и права учителя | см. выше | `backend/src/realtime/lesson.ts`, `room.ts`; `GET /api/directory/users`, `mode` в `PATCH /api/boards/:id`; `frontend/src/pages/board/{LessonUi,LaserLayer,useFollow}.tsx`, `frontend/src/pages/boards/AccessDialog.tsx`, `frontend/src/collab/{laser,follow}.ts`, `frontend/src/tools/availability.ts`, `e2e/` |
+| 4.1. Уроки и права учителя | 5c1abc8 | `backend/src/realtime/lesson.ts`, `room.ts`; `GET /api/directory/users`, `mode` в `PATCH /api/boards/:id`; `frontend/src/pages/board/{LessonUi,LaserLayer,useFollow}.tsx`, `frontend/src/pages/boards/AccessDialog.tsx`, `frontend/src/collab/{laser,follow}.ts`, `frontend/src/tools/availability.ts`, `e2e/` |
 
 Тесты: 76 в `packages/shared`, 92 в `backend`, 58 в `frontend`. Все проходят. Сквозной сценарий урока `e2e/lesson.cjs` прошёл в браузере (см. `e2e/README.md`).
 
