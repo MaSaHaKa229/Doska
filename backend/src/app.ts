@@ -18,11 +18,15 @@ import { authPlugin } from './auth/auth.plugin.js';
 import { authRoutes } from './auth/auth.routes.js';
 import { healthRoutes } from './health/health.routes.js';
 import { adminRoutes } from './admin/admin.routes.js';
+import { boardsRoutes } from './boards/boards.routes.js';
+import { registerRealtime, type RealtimeOptions } from './realtime/server.js';
 
 export interface BuildAppOptions {
   config: AppConfig;
   /** Готовый клиент Prisma (тесты); иначе создаётся новый. */
   prisma?: PrismaClient;
+  /** Параметры сервера реального времени (тесты ускоряют таймеры). */
+  realtime?: Partial<RealtimeOptions>;
   /** Дополнительная регистрация маршрутов (тесты). */
   extend?: (app: FastifyInstance) => Promise<void> | void;
 }
@@ -30,7 +34,7 @@ export interface BuildAppOptions {
 /**
  * Сборка приложения без запуска сервера (используется и main.ts, и тестами).
  */
-export async function buildApp({ config, prisma, extend }: BuildAppOptions): Promise<FastifyInstance> {
+export async function buildApp({ config, prisma, extend, realtime }: BuildAppOptions): Promise<FastifyInstance> {
   const app = Fastify({
     logger: loggerOptions(config),
     trustProxy: config.trustProxy,
@@ -69,6 +73,8 @@ export async function buildApp({ config, prisma, extend }: BuildAppOptions): Pro
   await app.register(healthRoutes, { prefix: '/api' });
   await app.register(authRoutes, { prefix: '/api/auth' });
   await app.register(adminRoutes, { prefix: '/api/admin' });
+  await app.register(boardsRoutes, { prefix: '/api' });
+  registerRealtime(app, realtime);
 
   if (extend) await extend(app);
 

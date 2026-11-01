@@ -1,10 +1,11 @@
 import { Navigate } from 'react-router-dom';
-import { LayoutGrid, LogOut, Settings2 } from 'lucide-react';
+import { LogOut, Settings2 } from 'lucide-react';
+import { BoardsSection } from './boards/BoardsSection';
 import { USER_ROLE_LABELS } from '@doska/shared';
 import { useAuth } from '../store/auth';
 import { Checkbox, SelectField } from '../ui/Field';
 import { Button } from '../ui/Button';
-import { Alert, Avatar, EmptyState, PageHeader } from '../ui/misc';
+import { Alert, Avatar, PageHeader } from '../ui/misc';
 import { errorMessage } from '../api/http';
 import { toast } from '../store/toast';
 import { useState } from 'react';
@@ -12,9 +13,8 @@ import { ConfirmDialog } from '../ui/ConfirmDialog';
 import { useNavigate } from 'react-router-dom';
 
 /**
- * Главная страница учителя и ученика. Администратор попадает в панель.
- * Список досок и заданий подключается на этапах 3.1 (доски учителя) и
- * 4.2 (доступные ученику доски, задания, конспект).
+ * Главная страница учителя и ученика: доски, конспекты, настройки.
+ * Администратор попадает в панель. Задания добавляются на этапе 4.2.
  */
 export function HomePage() {
   const { user, updatePreferences, logout } = useAuth();
@@ -38,17 +38,7 @@ export function HomePage() {
         subtitle={USER_ROLE_LABELS[user.role]}
       />
 
-      <section className="card">
-        <div className="card__header">
-          <LayoutGrid size={18} />
-          <h2>{user.role === 'TEACHER' ? 'Мои доски' : 'Доски и задания'}</h2>
-        </div>
-        <EmptyState icon={<LayoutGrid size={40} />} title="Здесь появятся доски">
-          {user.role === 'TEACHER'
-            ? 'Создание досок, папки и поиск подключаются на этапе 3.1, раздача заданий — на этапе 4.2.'
-            : 'Доски, к которым вас допустит учитель, задания и личный конспект подключаются на этапах 3.1 и 4.2.'}
-        </EmptyState>
-      </section>
+      <BoardsSection user={user} />
 
       <section className="card">
         <div className="card__header">

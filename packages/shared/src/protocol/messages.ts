@@ -40,6 +40,8 @@ export const CloseCode = {
   /** Пользователь обязан сменить временный пароль. */
   PasswordChangeRequired: 4428,
   MessageTooLarge: 4413,
+  /** Нарушение протокола (битый кадр, недопустимая структура обновления). */
+  ProtocolViolation: 4400,
   RateLimited: 4429,
   /** Тот же клиент открыл доску в другой вкладке с тем же sessionId. */
   Superseded: 4409,

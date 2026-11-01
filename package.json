@@ -22,5 +22,8 @@
     "db:migrate": "npm run db:migrate -w @doska/backend",
     "db:seed": "npm run db:seed -w @doska/backend",
     "dev:frontend": "npm run dev -w @doska/frontend"
+  },
+  "overrides": {
+    "vite": "6.4.5"
   }
 }

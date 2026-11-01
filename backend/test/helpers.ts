@@ -2,6 +2,7 @@ import { PrismaClient, type UserRole } from '@prisma/client';
 import type { FastifyInstance, LightMyRequestResponse } from 'fastify';
 import { AUTH_COOKIES, CSRF_HEADER } from '@doska/shared';
 import { buildApp } from '../src/app.js';
+import type { RealtimeOptions } from '../src/realtime/server.js';
 import { loadConfig, type AppConfig } from '../src/config/env.js';
 import { PasswordHasher } from '../src/auth/password.js';
 import { TEST_DATABASE_URL } from './global-setup.js';
@@ -42,8 +43,9 @@ export async function resetDb(prisma = testPrisma()): Promise<void> {
 export async function createTestApp(
   overrides: Record<string, string> = {},
   extend?: (app: FastifyInstance) => Promise<void> | void,
+  realtime?: Partial<RealtimeOptions>,
 ): Promise<FastifyInstance> {
-  const app = await buildApp({ config: testConfig(overrides), prisma: testPrisma(), extend });
+  const app = await buildApp({ config: testConfig(overrides), prisma: testPrisma(), extend, realtime });
   await app.ready();
   return app;
 }

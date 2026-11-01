@@ -10,6 +10,12 @@ export interface AppEventMap {
   'user.sessionsRevoked': { userId: string; reason: 'blocked' | 'deleted' | 'password-changed' | 'password-reset' | 'logout-all' };
   /** Изменились данные пользователя (ФИО, роль, цвет) — обновить кэши. */
   'user.updated': { userId: string };
+  /** Изменился доступ к доске (классы, участники, мел) — пересчитать права подключённых. */
+  'board.accessChanged': { boardId: string };
+  /** Изменились свойства доски (название, режим, настройки). */
+  'board.updated': { boardId: string };
+  /** Доска удалена — закрыть подключения. */
+  'board.deleted': { boardId: string };
 }
 
 export class AppEvents {

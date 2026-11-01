@@ -207,3 +207,106 @@
   grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
   gap: 14px;
 }
+
+/* ---------- Доски на главной ---------- */
+.boards-layout {
+  display: grid;
+  grid-template-columns: 240px minmax(0, 1fr);
+}
+.folders {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 2px;
+  padding: 12px 8px;
+  border-right: 1px solid var(--border);
+}
+.folders > .btn {
+  align-self: flex-start;
+}
+.folder-link {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 36px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: var(--radius-s);
+  background: none;
+  color: var(--text-2);
+  text-align: left;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.folder-link:hover {
+  background: var(--surface-2);
+}
+.folder-link.active {
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-weight: 600;
+}
+.board-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 14px;
+  padding: 16px;
+}
+.board-card {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  overflow: hidden;
+  transition: box-shadow 0.15s var(--ease), border-color 0.15s var(--ease);
+}
+.board-card:hover {
+  border-color: var(--border-strong);
+  box-shadow: var(--shadow-1);
+}
+.board-card__thumb {
+  display: grid;
+  place-items: center;
+  height: 120px;
+  color: var(--border-strong);
+  background:
+    linear-gradient(var(--surface-3) 1px, transparent 1px) 0 0 / 16px 16px,
+    linear-gradient(90deg, var(--surface-3) 1px, transparent 1px) 0 0 / 16px 16px,
+    var(--surface-2);
+}
+.board-card__body {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px 14px 4px;
+  flex: 1;
+}
+.board-card__title {
+  font-size: 1rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.board-card__actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 10px 10px 14px;
+}
+@media (max-width: 760px) {
+  .boards-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .folders {
+    flex-direction: row;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    border-right: 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .folders > .row {
+    padding-left: 0 !important;
+    flex: none;
+  }
+}

@@ -16,3 +16,4 @@ export * from './api/auth.js';
 export * from './api/translit.js';
 export * from './api/csv.js';
 export * from './api/admin.js';
+export * from './api/boards.js';
