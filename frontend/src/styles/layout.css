@@ -1159,3 +1159,46 @@ kbd {
 .calc-panel p {
   margin: 0;
 }
+
+/* ----- Разделы инструментов (6.1a) ----- */
+.tool-flyout-toggle {
+  position: relative;
+}
+.tool-btn__more {
+  position: absolute;
+  right: 4px;
+  bottom: 4px;
+  border: 3px solid transparent;
+  border-right-color: currentColor;
+  border-bottom-color: currentColor;
+}
+.tool-flyout {
+  position: fixed;
+  z-index: 45;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 220px;
+  max-height: calc(100dvh - 16px);
+  padding: 6px;
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-l);
+  background: var(--surface);
+  box-shadow: var(--shadow-2);
+}
+.tool-flyout__title {
+  padding: 4px 8px 6px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-3);
+}
+.tool-btn--wide {
+  display: flex;
+  justify-content: flex-start;
+  gap: 10px;
+  width: 100%;
+  height: 38px;
+  padding: 0 10px;
+  color: var(--text);
+}

@@ -91,6 +91,10 @@ export class BoardModel {
   private readonly pageIndex = new Map<string, SpatialIndex>();
   private readonly pageOrderCache = new Map<string, string[]>();
   private readonly children = new Map<string, Set<string>>();
+  /** Динамическая геометрия: опорный объект → объекты, которые на него ссылаются (deps). */
+  private readonly dependents = new Map<string, Set<string>>();
+  /** Неограниченные объекты (прямая, луч) по страницам: видны при любой области. */
+  private readonly unboundedIds = new Map<string, Set<string>>();
   private pagesCache: PageRecord[] | null = null;
 
   private readonly objectListeners = new Map<string, Set<Listener>>();
@@ -203,6 +207,7 @@ export class BoardModel {
     const index = this.pageIndex.get(pageId);
     if (!index) return [];
     const hits = new Set(index.search(rect));
+    for (const id of this.unboundedIds.get(pageId) ?? []) hits.add(id);
     if (hits.size === 0) return [];
     return this.pageObjects(pageId).filter((id) => hits.has(id));
   }
@@ -229,7 +234,88 @@ export class BoardModel {
       }
       if (e.module.hitTest(e.obj, point, tolerance, this.resolve)) out.push(e.obj.id);
     }
+    // Точка динамической геометрии берётся раньше отрезка, проходящего через неё.
+    const prio = (id: string) => this.entries.get(id)?.module?.hitPriority ?? 0;
+    return out.map((id, i) => ({ id, i })).sort((a, b) => prio(b.id) - prio(a.id) || a.i - b.i).map((x) => x.id);
+  }
+
+  // ------------------------------------------------------------------
+  //  Динамическая геометрия
+  // ------------------------------------------------------------------
+
+  /** Есть ли объекты, ссылающиеся на этот. */
+  hasDependents(id: string): boolean {
+    return (this.dependents.get(id)?.size ?? 0) > 0;
+  }
+
+  /** Все объекты, зависящие (транзитивно) от данных, кроме самих данных. */
+  dependentsOf(ids: Iterable<string>): string[] {
+    const start = new Set(ids);
+    const seen = new Set<string>();
+    const stack = [...start];
+    while (stack.length) {
+      const id = stack.pop()!;
+      for (const d of this.dependents.get(id) ?? []) {
+        if (seen.has(d) || start.has(d)) continue;
+        seen.add(d);
+        stack.push(d);
+      }
+    }
+    return [...seen].filter((id) => this.entries.has(id));
+  }
+
+  /**
+   * Что на самом деле двигается при перемещении объектов: обычный объект —
+   * он сам, производный (отрезок, окружность) — его свободные опорные точки.
+   */
+  movableSet(ids: Iterable<string>): string[] {
+    const out = new Set<string>();
+    const seen = new Set<string>();
+    const visit = (id: string) => {
+      if (seen.has(id)) return;
+      seen.add(id);
+      const e = this.entries.get(id);
+      if (!e) return;
+      if (e.module?.derived) e.obj.deps.forEach(visit);
+      else out.add(id);
+    };
+    for (const id of ids) visit(id);
+    return [...out];
+  }
+
+  /** Опорные объекты (транзитивно), без самих данных. */
+  private depsClosure(ids: Iterable<string>): Set<string> {
+    const start = new Set(ids);
+    const out = new Set<string>();
+    const stack = [...start];
+    while (stack.length) {
+      const id = stack.pop()!;
+      for (const d of this.entries.get(id)?.obj.deps ?? []) {
+        if (out.has(d) || start.has(d) || !this.entries.has(d)) continue;
+        out.add(d);
+        stack.push(d);
+      }
+    }
     return out;
+  }
+
+  /**
+   * Порядок пересчёта зависимых объектов (топологическая сортировка: опоры
+   * раньше построений). Циклы не создаются инструментами; на случай
+   * испорченного документа обход их просто обрывает.
+   */
+  private refreshOrder(changed: Iterable<string>): string[] {
+    const order: string[] = [];
+    const state = new Map<string, 1 | 2>();
+    const visit = (id: string) => {
+      if (state.has(id)) return;
+      state.set(id, 1);
+      for (const d of this.dependents.get(id) ?? []) visit(d);
+      state.set(id, 2);
+      order.push(id);
+    };
+    for (const id of changed) visit(id);
+    return order.reverse();
   }
 
   /**
@@ -393,7 +479,7 @@ export class BoardModel {
       const b = (e.obj.props as Record<string, unknown>).__bounds as Rect | undefined;
       local = b && typeof b.width === 'number' ? b : { x: 0, y: 0, width: 80, height: 40 };
     }
-    e.bounds = local ? transformRect(transformToMatrix(e.obj), local) : null;
+    e.bounds = local ? (e.module?.derived ? local : transformRect(transformToMatrix(e.obj), local)) : null;
     const index = this.indexFor(e.obj.pageId);
     if (e.bounds) index.set(id, e.bounds);
     else index.remove(id);
@@ -422,6 +508,18 @@ export class BoardModel {
         this.touchPage(b.pageId, dirtyPages);
       }
       if (b?.groupId && b.groupId !== a?.groupId) this.children.get(b.groupId)?.delete(id);
+      for (const d of b?.deps ?? []) this.dependents.get(d)?.delete(id);
+      for (const d of a?.deps ?? []) {
+        let set = this.dependents.get(d);
+        if (!set) this.dependents.set(d, (set = new Set()));
+        set.add(id);
+      }
+      if (b) this.unboundedIds.get(b.pageId)?.delete(id);
+      if (a && after?.module?.unbounded && !after.broken) {
+        let set = this.unboundedIds.get(a.pageId);
+        if (!set) this.unboundedIds.set(a.pageId, (set = new Set()));
+        set.add(id);
+      }
       if (a) {
         let members = this.pageMembers.get(a.pageId);
         if (!members) this.pageMembers.set(a.pageId, (members = new Set()));
@@ -438,6 +536,24 @@ export class BoardModel {
         this.children.delete(id);
       }
       this.objectListeners.get(id)?.forEach((l) => l());
+    }
+    // Построения на изменённых объектах пересчитываются (локально, без записи
+    // в документ): габарит, отрисовка, привязки. Изменённые производные
+    // объекты — тоже: их опоры могли измениться в той же транзакции.
+    const derivedChanged = [...ids].filter((id) => this.entries.get(id)?.module?.derived);
+    const refresh = this.refreshOrder([...ids].filter((id) => this.dependents.get(id)?.size).concat(derivedChanged));
+    for (const id of refresh) {
+      const e = this.entries.get(id);
+      if (!e) continue;
+      if (!ids.has(id)) {
+        // Новый объект записи — сигнал перерисовки для подписчиков.
+        this.entries.set(id, { ...e });
+      }
+      if (!ids.has(id) || e.module?.derived) {
+        this.updateBounds(id);
+        this.touchPage(e.obj.pageId, dirtyPages);
+        if (!ids.has(id)) this.objectListeners.get(id)?.forEach((l) => l());
+      }
     }
     for (const p of dirtyPages) {
       this.pageVersions.set(p, (this.pageVersions.get(p) ?? 0) + 1);
@@ -499,6 +615,22 @@ export class BoardModel {
     this.doc.transact(fn, LOCAL_ORIGIN);
   }
 
+  /**
+   * Последний выданный верхний z-ключ по странице и слою: несколько объектов,
+   * созданных в одной транзакции, ещё не видны в индексе, но должны лечь
+   * друг над другом в порядке создания, а не получить одинаковый ключ.
+   */
+  private readonly issuedTopZ = new Map<string, string>();
+
+  private issueTopZ(pageId: string, layer: ObjectLayer): string {
+    const key = `${pageId}|${layer}`;
+    const top = this.topZ(pageId, layer);
+    const issued = this.issuedTopZ.get(key);
+    const z = generateKeyBetween(issued && (!top || issued > top) ? issued : top, null);
+    this.issuedTopZ.set(key, z);
+    return z;
+  }
+
   /** z-ключ над самым верхним объектом слоя страницы. */
   private bottomZ(pageId: string, layer: ObjectLayer): string | null {
     for (const id of this.pageObjects(pageId)) {
@@ -548,7 +680,7 @@ export class BoardModel {
         init.z ??
         (init.placement === 'bottom'
           ? generateKeyBetween(null, this.bottomZ(init.pageId, layer))
-          : generateKeyBetween(this.topZ(init.pageId, layer), null)),
+          : this.issueTopZ(init.pageId, layer)),
       userId: this.opts.userId,
       now: Date.now(),
       v: module?.version ?? 1,
@@ -608,6 +740,18 @@ export class BoardModel {
   deleteObjects(ids: Iterable<string>): number {
     const all = new Set<string>();
     for (const id of ids) this.descendants(id, all);
+    // Точки, созданные инструментом вместе с построением (props.auto), уходят
+    // вместе с ним, если на них больше ничего не опирается.
+    for (let grew = true; grew; ) {
+      grew = false;
+      for (const d of this.depsClosure(all)) {
+        if (all.has(d) || (this.entries.get(d)?.obj.props as { auto?: unknown } | undefined)?.auto !== true) continue;
+        if ([...(this.dependents.get(d) ?? [])].every((x) => all.has(x) || !this.entries.has(x))) {
+          all.add(d);
+          grew = true;
+        }
+      }
+    }
     const allowed = [...all].filter((id) => this.canDelete(id));
     if (!allowed.length) return 0;
     this.transact(() => {
@@ -694,6 +838,8 @@ export class BoardModel {
   serialize(rootIds: string[]): SerializedBoardObject[] {
     const all = new Set<string>();
     for (const id of rootIds) this.descendants(id, all);
+    // Построение копируется вместе с опорами: отрезок — со своими концами.
+    for (const d of this.depsClosure(all)) this.descendants(d, all);
     const out: SerializedBoardObject[] = [];
     const byPage = new Map<string, string[]>();
     for (const id of all) {
@@ -742,8 +888,9 @@ export class BoardModel {
           pageId,
           z: keys[i]!,
           layer,
-          x: o.x + offset.x,
-          y: o.y + offset.y,
+          // У производной геометрии x, y не используются: сдвигаются её опоры.
+          x: this.moduleFor(o.type)?.derived ? o.x : o.x + offset.x,
+          y: this.moduleFor(o.type)?.derived ? o.y : o.y + offset.y,
           locked: isModerator ? o.locked : false,
           groupId: o.groupId ? (idMap.get(o.groupId) ?? null) : null,
           deps: o.deps.map((d) => idMap.get(d) ?? d),

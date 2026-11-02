@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from 'react';
+import { useCallback, useEffect, useMemo, useState, useSyncExternalStore, type ReactNode } from 'react';
 import {
   ArrowDownToLine,
   ArrowUpToLine,
@@ -25,6 +25,7 @@ import {
   type InspectorField,
   type PageRecord,
   type ToolGroup,
+  type ToolModule,
 } from '@doska/shared';
 import type { BoardModel } from '../../collab/model';
 import { registry } from '../../plugins/registry';
@@ -58,32 +59,105 @@ export function Toolbar() {
   const tools = registry.listTools();
   const groups = GROUP_ORDER.map((g) => ({ group: g, tools: tools.filter((t) => t.group === g) })).filter((g) => g.tools.length);
 
+  const button = (t: ToolModule<unknown>, onPick?: () => void, withTitle = false) => {
+    const Icon = toolIcon(t.icon);
+    const reason = toolUnavailable(t, caps);
+    return (
+      <button
+        key={t.id}
+        type="button"
+        className={`tool-btn${toolId === t.id ? ' active' : ''}${withTitle ? ' tool-btn--wide' : ''}`}
+        aria-pressed={toolId === t.id}
+        aria-label={t.title}
+        title={reason ? `${t.title} — ${reason}` : `${t.title}${t.hotkey ? ` (${t.hotkey})` : ''}`}
+        disabled={!!reason}
+        onClick={() => {
+          setTool(t.id);
+          onPick?.();
+        }}
+      >
+        <Icon size={20} />
+        {withTitle && <span>{t.title}</span>}
+      </button>
+    );
+  };
+
   return (
     <nav className="board-toolbar" aria-label="Инструменты">
-      {groups.map(({ group, tools: list }) => (
-        <div key={group} className="board-toolbar__group" role="group" aria-label={TOOL_GROUP_LABELS[group]}>
-          {list.map((t) => {
-            const Icon = toolIcon(t.icon);
-            const reason = toolUnavailable(t, caps);
-            const disabled = !!reason;
-            return (
-              <button
-                key={t.id}
-                type="button"
-                className={`tool-btn${toolId === t.id ? ' active' : ''}`}
-                aria-pressed={toolId === t.id}
-                aria-label={t.title}
-                title={reason ? `${t.title} — ${reason}` : `${t.title}${t.hotkey ? ` (${t.hotkey})` : ''}`}
-                disabled={disabled}
-                onClick={() => setTool(t.id)}
-              >
-                <Icon size={20} />
-              </button>
-            );
-          })}
-        </div>
-      ))}
+      {groups.map(({ group, tools: list }) => {
+        // Инструменты разделов (планиметрия, оптика…) — одной кнопкой с раскрывающимся списком.
+        const sections = [...new Set(list.filter((t) => t.section).map((t) => t.section!))];
+        return (
+          <div key={group} className="board-toolbar__group" role="group" aria-label={TOOL_GROUP_LABELS[group]}>
+            {list.filter((t) => !t.section).map((t) => button(t))}
+            {sections.map((sec) => (
+              <SectionFlyout key={sec} section={sec} tools={list.filter((t) => t.section === sec)} activeId={toolId} render={button} />
+            ))}
+          </div>
+        );
+      })}
     </nav>
+  );
+}
+
+/** Раздел инструментов: кнопка с последним выбранным инструментом и список всех. */
+function SectionFlyout({
+  section,
+  tools,
+  activeId,
+  render,
+}: {
+  section: string;
+  tools: ToolModule<unknown>[];
+  activeId: string;
+  render: (t: ToolModule<unknown>, onPick?: () => void, withTitle?: boolean) => ReactNode;
+}) {
+  const [open, setOpen] = useState<{ left: number; top: number } | null>(null);
+  const [last, setLast] = useState(tools[0]!.id);
+  useEffect(() => {
+    if (tools.some((t) => t.id === activeId)) setLast(activeId);
+  }, [activeId, tools]);
+  useEffect(() => {
+    if (!open) return;
+    const close = (e: Event) => {
+      if (!(e.target as HTMLElement | null)?.closest?.('.tool-flyout, .tool-flyout-toggle')) setOpen(null);
+    };
+    const esc = (e: KeyboardEvent) => e.key === 'Escape' && setOpen(null);
+    window.addEventListener('pointerdown', close);
+    window.addEventListener('keydown', esc);
+    return () => {
+      window.removeEventListener('pointerdown', close);
+      window.removeEventListener('keydown', esc);
+    };
+  }, [open]);
+  const current = tools.find((t) => t.id === last) ?? tools[0]!;
+  const Icon = toolIcon(current.icon);
+  const title = registry.listPlugins().find((p) => p.id === section)?.title ?? section;
+  const active = tools.some((t) => t.id === activeId);
+  return (
+    <>
+      <button
+        type="button"
+        className={`tool-btn tool-flyout-toggle${active ? ' active' : ''}`}
+        aria-haspopup="menu"
+        aria-expanded={!!open}
+        aria-label={`${title}: инструменты`}
+        title={`${title} — ${current.title}`}
+        onClick={(e) => {
+          const r = e.currentTarget.getBoundingClientRect();
+          setOpen(open ? null : { left: r.right + 6, top: Math.min(r.top, window.innerHeight - 40 * tools.length - 60) });
+        }}
+      >
+        <Icon size={20} />
+        <span className="tool-btn__more" aria-hidden />
+      </button>
+      {open && (
+        <div className="tool-flyout" role="menu" aria-label={title} style={{ left: open.left, top: Math.max(8, open.top) }}>
+          <div className="tool-flyout__title">{title}</div>
+          {tools.map((t) => render(t, () => setOpen(null), true))}
+        </div>
+      )}
+    </>
   );
 }
 

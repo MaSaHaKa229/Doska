@@ -30,6 +30,7 @@ import { useFollowLead, useFollowView } from './useFollow';
 import { CommandPalette, HelpDialog } from './Palette';
 import { coreCommands } from './boardCommands';
 import { pluralize } from '../../lib/format';
+import { ConfirmDialog } from '../../ui/ConfirmDialog';
 
 const DETAILS_CACHE = 'doska.boardCache.';
 
@@ -140,6 +141,14 @@ function BoardWorkspace({ session }: { session: BoardSession }) {
   useBoardShortcuts(commands, ui);
   // Картинки и PDF: импорт PDF — через диалог; файлы от инструмента «Картинка или PDF».
   const [pdfRequest, setPdfRequest] = useState<{ asset: AssetView; name: string } | null>(null);
+  // Удаление опор динамической геометрии: построения на них — вместе с ними или отмена.
+  const [dependentsRequest, setDependentsRequest] = useState<{ count: number; proceed: () => void } | null>(null);
+  useEffect(() => {
+    commands.confirmDependents = (count, proceed) => setDependentsRequest({ count, proceed });
+    return () => {
+      commands.confirmDependents = null;
+    };
+  }, [commands]);
   useEffect(() => {
     commands.pdfHandler = (asset, name) => {
       if (!useBoard.getState().caps?.managePages) {
@@ -281,6 +290,22 @@ function BoardWorkspace({ session }: { session: BoardSession }) {
       />
       <PdfImportDialog model={model} request={pdfRequest} onClose={() => setPdfRequest(null)} />
       <HelpDialog open={helpOpen} onClose={() => setHelpOpen(false)} commands={paletteCommands} />
+      <ConfirmDialog
+        open={!!dependentsRequest}
+        title="Удалить вместе с построениями?"
+        message={
+          dependentsRequest
+            ? `От выделенного ${pluralize(dependentsRequest.count, 'зависит', 'зависят', 'зависят')} ${dependentsRequest.count} ${pluralize(dependentsRequest.count, 'построение', 'построения', 'построений')}. Без опоры они не могут существовать.`
+            : ''
+        }
+        confirmLabel="Удалить вместе с ними"
+        danger
+        onConfirm={() => {
+          dependentsRequest?.proceed();
+          setDependentsRequest(null);
+        }}
+        onClose={() => setDependentsRequest(null)}
+      />
     </div>
   );
 }

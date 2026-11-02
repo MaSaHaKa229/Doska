@@ -109,11 +109,12 @@ export const ObjectView = memo(function ObjectView({ model, id, theme, register 
     <Group
       ref={ref}
       id={obj.id}
-      x={obj.x}
-      y={obj.y}
-      rotation={(obj.rotation * 180) / Math.PI}
-      scaleX={obj.scaleX}
-      scaleY={obj.scaleY}
+      // Производная геометрия рисуется в мировых координатах.
+      x={module?.derived ? 0 : obj.x}
+      y={module?.derived ? 0 : obj.y}
+      rotation={module?.derived ? 0 : (obj.rotation * 180) / Math.PI}
+      scaleX={module?.derived ? 1 : obj.scaleX}
+      scaleY={module?.derived ? 1 : obj.scaleY}
       visible={!obj.hidden}
       listening={false}
     >
@@ -144,6 +145,13 @@ type Interaction =
       wasSelected: boolean;
       /** Характерные точки перемещаемых объектов (для привязки при перемещении). */
       snapPoints: Point[];
+      /** Что не служит целью привязки: перемещаемое и построения на нём. */
+      exclude: Set<string>;
+      /**
+       * Динамическая геометрия: изменения пишутся в документ по ходу жеста
+       * (построения на точках перестраиваются сразу), шаги склеиваются.
+       */
+      live: boolean;
     }
   | { kind: 'handle'; objectId: string; handleId: string; pointerId: number }
   | { kind: 'tool'; pointerId: number };
@@ -306,7 +314,8 @@ export function BoardStage({ model, stageRef: externalStageRef, sizeRef: externa
       resolve: model.resolve,
       createObject: (type, init) => model.createObject(type, { ...init, pageId: s().pageId ?? '' }) ?? '',
       updateObject: (id, patch) => void model.updateObjects([{ id, patch }]),
-      deleteObjects: (ids) => void model.deleteObjects(ids),
+      // Стёртая точка уносит построения на ней (ластик — явное намерение убрать).
+      deleteObjects: (ids) => void model.deleteObjects([...ids, ...model.dependentsOf(ids)]),
       transact: (fn, opts) => model.transact(fn, opts),
       canModify: (id) => model.canModify(id, 'props'),
       canDelete: (id) => model.canDelete(id),
@@ -314,6 +323,11 @@ export function BoardStage({ model, stageRef: externalStageRef, sizeRef: externa
         const pageId = s().pageId;
         presenceRef.current?.setDrawing(d && pageId ? { ...d, pageId, points: compactForPresence(d.points) } : null);
       },
+      listObjects: (type) =>
+        model
+          .pageObjects(s().pageId ?? '')
+          .map((id) => model.getObject(id))
+          .filter((o): o is BoardObject => !!o && (!type || o.type === type)),
       hitTest: (pt, tol) =>
         model
           .hitTest(s().pageId ?? '', pt, tol)
@@ -463,20 +477,26 @@ export function BoardStage({ model, stageRef: externalStageRef, sizeRef: externa
         if (e.shiftKey) next = wasSelected ? next.filter((x) => x !== root) : [...next, root];
         else if (!wasSelected) next = [root];
         store.setSelection(next);
-        const moveLeaves = model.leaves(next);
+        const selectedLeaves = model.leaves(next);
+        // Построение (отрезок, окружность) двигается своими свободными точками.
+        const moveLeaves = model.movableSet(selectedLeaves);
         const canMove = !!caps?.write && moveLeaves.length > 0 && moveLeaves.every((id) => model.canModify(id, 'x'));
         if (canMove && next.includes(root)) {
+          const live = moveLeaves.length !== selectedLeaves.length || moveLeaves.some((id) => model.hasDependents(id));
+          if (live) model.undo.stopCapturing(); // весь жест — один шаг отмены
           interaction.current = {
             kind: 'move',
             startScreen: sp,
             startWorld: world,
             leaves: moveLeaves,
+            live,
+            exclude: new Set([...moveLeaves, ...selectedLeaves, ...model.dependentsOf(moveLeaves)]),
             origin: new Map(moveLeaves.map((id) => [id, { x: model.getObject(id)!.x, y: model.getObject(id)!.y }])),
             moved: false,
             pointerId: e.pointerId,
             clickRoot: root,
             wasSelected,
-            snapPoints: moveLeaves
+            snapPoints: selectedLeaves
               .flatMap((id) => {
                 const en = model.get(id);
                 return en?.module?.getSnapPoints?.(en.obj, model.resolve).map((p) => p.point) ?? [];
@@ -544,6 +564,10 @@ export function BoardStage({ model, stageRef: externalStageRef, sizeRef: externa
       // Во время перетаскивания узлы двигаются напрямую (без записи в документ
       // на каждом кадре); в документ — одна транзакция при отпускании.
       const { dx, dy } = snappedDelta(it, world, e.altKey);
+      if (it.live) {
+        model.updateObjects(it.leaves.map((id) => ({ id, patch: { x: it.origin.get(id)!.x + dx, y: it.origin.get(id)!.y + dy } })), { merge: true });
+        return;
+      }
       for (const id of it.leaves) {
         const node = nodes.current.get(id);
         const o = it.origin.get(id)!;
@@ -594,7 +618,7 @@ export function BoardStage({ model, stageRef: externalStageRef, sizeRef: externa
     let dx = world.x - it.startWorld.x;
     let dy = world.y - it.startWorld.y;
     let best: { d: number; cx: number; cy: number; snap: SnapResult } | null = null;
-    const exclude = new Set(it.leaves);
+    const exclude = it.exclude;
     for (const p of it.snapPoints) {
       const moved = { x: p.x + dx, y: p.y + dy };
       const snap = snapPoint(moved, alt, exclude);
@@ -641,7 +665,7 @@ export function BoardStage({ model, stageRef: externalStageRef, sizeRef: externa
       case 'move':
         if (it.moved) {
           const { dx, dy } = snappedDelta(it, world, e.altKey);
-          model.updateObjects(it.leaves.map((id) => ({ id, patch: { x: it.origin.get(id)!.x + dx, y: it.origin.get(id)!.y + dy } })));
+          model.updateObjects(it.leaves.map((id) => ({ id, patch: { x: it.origin.get(id)!.x + dx, y: it.origin.get(id)!.y + dy } })), { merge: it.live });
         } else if (it.wasSelected && !e.shiftKey && store.selection.length > 1) {
           // Щелчок по уже выделенному без перетаскивания — оставить только его.
           store.setSelection([it.clickRoot]);
@@ -662,7 +686,9 @@ export function BoardStage({ model, stageRef: externalStageRef, sizeRef: externa
 
   const cancelInteraction = () => {
     const it = interaction.current;
-    if (it.kind === 'move') {
+    if (it.kind === 'move' && it.live && it.moved) {
+      model.updateObjects(it.leaves.map((id) => ({ id, patch: it.origin.get(id)! })), { merge: true });
+    } else if (it.kind === 'move') {
       for (const id of it.leaves) nodes.current.get(id)?.position(it.origin.get(id)!);
       stageRef.current?.batchDraw();
     }
@@ -690,6 +716,21 @@ export function BoardStage({ model, stageRef: externalStageRef, sizeRef: externa
     el.addEventListener('wheel', onWheel, { passive: false });
     return () => el.removeEventListener('wheel', onWheel);
   }, []);
+
+  // Клавиши инструменту (Esc — отменить построение, Enter — завершить ломаную):
+  // раньше горячих клавиш доски; обработанная инструментом клавиша дальше не идёт.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const t = e.target as HTMLElement | null;
+      if (!tool?.onKeyDown || (t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName)))) return;
+      if (tool.onKeyDown(e.key, { shift: e.shiftKey, alt: e.altKey, ctrl: e.ctrlKey || e.metaKey }, toolCtx)) {
+        e.preventDefault();
+        e.stopImmediatePropagation();
+      }
+    };
+    window.addEventListener('keydown', onKey, true);
+    return () => window.removeEventListener('keydown', onKey, true);
+  }, [tool, toolCtx]);
 
   // Esc отменяет текущее перетаскивание.
   useEffect(() => {

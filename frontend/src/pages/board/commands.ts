@@ -23,6 +23,11 @@ export class BoardCommands {
   private lastPasted = '';
   /** Диалог импорта PDF (задаёт страница доски). */
   pdfHandler: ((asset: AssetView, name: string) => void) | null = null;
+  /**
+   * Подтверждение удаления опор динамической геометрии: от выделенного
+   * зависят count построений. Задаёт страница доски; без него — удаляются вместе.
+   */
+  confirmDependents: ((count: number, proceed: () => void) => void) | null = null;
 
   constructor(
     private readonly model: BoardModel,
@@ -51,10 +56,16 @@ export class BoardCommands {
   deleteSelection(): void {
     const sel = this.store.selection;
     if (!sel.length) return;
-    const total = this.model.leaves(sel).length;
-    const deleted = this.model.deleteObjects(sel);
-    this.store.setSelection([]);
-    if (deleted < total) toast.info('Часть объектов нельзя удалить: они заблокированы или принадлежат другим');
+    const dependents = this.model.dependentsOf(this.model.leaves(sel));
+    const run = () => {
+      const ids = [...sel, ...dependents];
+      const total = this.model.leaves(ids).length;
+      const deleted = this.model.deleteObjects(ids);
+      this.store.setSelection([]);
+      if (deleted < total) toast.info('Часть объектов нельзя удалить: они заблокированы или принадлежат другим');
+    };
+    if (dependents.length && this.confirmDependents) this.confirmDependents(dependents.length, run);
+    else run();
   }
 
   copyObjects(): SerializedBoardObject[] {

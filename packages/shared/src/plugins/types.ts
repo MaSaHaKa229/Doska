@@ -196,6 +196,24 @@ export interface ObjectModule<P = Record<string, JsonValue>, R = unknown> {
   /** Имя редактора, открываемого двойным кликом ('formula', 'text', 'matrix'…). */
   editor?: string;
   /**
+   * Геометрия задаётся опорными объектами (deps) — динамическая геометрия.
+   * x, y, поворот и масштаб такого объекта не используются: render, габарит
+   * и попадание — в мировых координатах. Перемещение объекта двигает его
+   * свободные опорные объекты (точки), рамки трансформации у него нет.
+   */
+  derived?: boolean;
+  /**
+   * Приоритет при выборе объекта под курсором: больше — выбирается раньше
+   * объектов выше по слою (точку на отрезке можно взять мышью). По умолчанию 0.
+   */
+  hitPriority?: number;
+  /**
+   * Объект уходит за пределы габарита (прямая, луч): он рисуется и ищется
+   * под курсором при любой видимой области, а габарит (для «Показать всё»)
+   * описывает только его опорную часть.
+   */
+  unbounded?: boolean;
+  /**
    * Тяжёлое вычисление в Web Worker: имя задания и входные данные.
    * Ядро перезапускает задание при изменении входа (с отменой старого).
    */
@@ -282,6 +300,8 @@ export interface ToolContext {
    */
   publishDrawing(drawing: { tool: string; color: string; width: number; opacity: number; points: number[] } | null): void;
   hitTest(point: Point, tolerance: number): BoardObject[];
+  /** Объекты текущей страницы (по типу или все) — например, чтобы выбрать свободную подпись точки. */
+  listObjects(type?: string): BoardObject[];
   setSelection(ids: string[]): void;
   /** Предпросмотр (рисуется в оверлее и транслируется в awareness.drawing). */
   setPreview(preview: unknown | null): void;
