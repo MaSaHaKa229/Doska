@@ -15,7 +15,7 @@
 
 ## 2. Что сделано
 
-Ветка `stage-1-architecture`; последний коммит кода — `XXXXXXX` (этап 6.2b), затем коммит с `HANDOFF.md`. Ветка `main` указывает на коммит этапа 1 (`21e5b4a`). Открыт пулл-реквест #1 `stage-1-architecture` → `main`.
+Ветка `stage-1-architecture`; последний коммит кода — `d607676` (этап 6.2b), затем коммит с `HANDOFF.md`. Ветка `main` указывает на коммит этапа 1 (`21e5b4a`). Открыт пулл-реквест #1 `stage-1-architecture` → `main`.
 
 | Этап | Коммит | Основные файлы |
 |---|---|---|
@@ -26,7 +26,7 @@
 | 3.1. Доски, папки, сервер реального времени | 01efee1 | `backend/src/boards/`, `backend/src/realtime/{guard,room,server,persistence,connection,doc,rate-limit}.ts`, `frontend/src/pages/boards/` |
 | 3.2. Ядро холста | f268dd7 | `frontend/src/{collab,canvas,objects,tools,plugins}/`, `frontend/src/pages/board/` |
 | 3.3. Присутствие, офлайн, привязки, Ctrl+K, справка | 505e9f3 | `frontend/src/collab/{presence,people}.ts`, `frontend/src/canvas/snapping.ts`, `frontend/src/pages/board/{PresenceUi,ViewMenu,Palette,boardCommands}.tsx`, эндпоинт `GET /api/boards/:id/people` |
-| 6.2b. Анализ на графике | XXXXXXX | `frontend/src/math/analysis/{calculus.ts,features.tsx,calculus-tools.tsx}`, `derivatives` в `expr.ts`; `e2e/calculus.cjs` |
+| 6.2b. Анализ на графике | d607676 | `frontend/src/math/analysis/{calculus.ts,features.tsx,calculus-tools.tsx}`, `derivatives` в `expr.ts`; `e2e/calculus.cjs` |
 | 6.2a. Графики: оси, кривые, слайдеры, таблица, числовая прямая, тригокружность | e011d8f | `frontend/src/math/analysis/{plugin.ts,expr.ts,plot.ts,objects.tsx,editor.tsx,tools.tsx}`; `BoardPlugin.editors`, `EditorContext`, `ObjectModule.moveDeps`; `pages/board/PluginEditors.tsx`; `e2e/graphs.cjs` |
 | 6.1c. Линейка, транспортир, циркуль | cc9abef | `frontend/src/math/planimetry/drafting.tsx`; `ObjectModule.guides`/`finishHandle`, `ToolContext.guides` (`packages/shared/src/plugins/types.ts`); перо вдоль края (`tools/draw-tools.tsx`); `e2e/drafting.cjs` |
 | 6.1b. Построения, преобразования, отметки | 1371cc6 | `frontend/src/math/planimetry/{eval.ts,constructions.tsx}`, расширены `objects.tsx`, `geometry.ts`; `BoardPlugin.sections`, `ToolContext.getSelection`; ручки объектов с приоритетом без выделения (`BoardStage.handleAt`); `e2e/constructions.cjs` |
