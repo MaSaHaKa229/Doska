@@ -276,7 +276,7 @@ export class BoardModel {
       seen.add(id);
       const e = this.entries.get(id);
       if (!e) return;
-      if (e.module?.derived) e.obj.deps.forEach(visit);
+      if (e.module?.derived) (e.module.moveDeps ? e.module.moveDeps(e.obj) : e.obj.deps).forEach(visit);
       else out.add(id);
     };
     for (const id of ids) visit(id);

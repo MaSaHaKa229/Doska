@@ -42,6 +42,8 @@ export function FormulaEditorsHost({ model }: { model: BoardModel }) {
   useEffect(() => {
     const onEdit = (e: Event) => {
       const d = (e as CustomEvent<EditObjectDetail>).detail;
+      // Редакторы плагинов открывает PluginEditorsHost.
+      if (d.editor !== 'formula' && d.editor !== 'solution' && d.editor !== 'calc') return;
       if (d.editor === 'calc') {
         const id = d.id && model.canModify(d.id, 'props') ? d.id : null;
         const initial = d.id ? String((model.getObject(d.id)?.props as CalcProps | undefined)?.expr ?? '') : selectedExpression(model);

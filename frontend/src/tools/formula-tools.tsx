@@ -8,7 +8,8 @@ export const CALC_TOOL_ID = 'core.calc';
 /** Открыть редактор формулы или решения (страница доски слушает это событие). */
 export const EDIT_OBJECT_EVENT = 'doska:edit-object';
 export interface EditObjectDetail {
-  editor: 'formula' | 'solution' | 'calc';
+  /** Редактор: формула, решение, калькулятор или редактор плагина (BoardPlugin.editors). */
+  editor: string;
   /** Существующий объект или null — создать новый в точке at. */
   id: string | null;
   at: Point | null;

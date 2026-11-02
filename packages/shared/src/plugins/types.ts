@@ -215,6 +215,12 @@ export interface ObjectModule<P = Record<string, JsonValue>, R = unknown> {
    */
   derived?: boolean;
   /**
+   * Какие опоры производного объекта двигаются, когда тянут сам объект
+   * (по умолчанию — все). График двигает свою систему координат, но не
+   * слайдеры параметров.
+   */
+  moveDeps?(obj: BoardObject<P>): string[];
+  /**
    * Приоритет при выборе объекта под курсором: больше — выбирается раньше
    * объектов выше по слою (точку на отрезке можно взять мышью). По умолчанию 0.
    */
@@ -409,6 +415,23 @@ export interface ReferenceEntry {
 //  Плагин
 // ---------------------------------------------------------------------
 
+/**
+ * API редактора объекта плагина (диалог, открываемый двойным щелчком или
+ * инструментом): то же, что у инструмента, без указателя и предпросмотра.
+ */
+export type EditorContext = Pick<
+  ToolContext,
+  'userId' | 'pageId' | 'canWrite' | 'resolve' | 'createObject' | 'updateObject' | 'deleteObjects' | 'transact' | 'canModify' | 'listObjects' | 'setSelection' | 'getToolOptions'
+>;
+
+/** Свойства редактора плагина. objectId null — создать новый объект (в точке at). */
+export interface PluginEditorProps {
+  objectId: string | null;
+  at: Point | null;
+  ctx: EditorContext;
+  close(): void;
+}
+
 export type WorkerFactory = () => { postMessage(data: unknown): void; terminate(): void };
 
 export interface BoardPlugin<R = unknown> {
@@ -428,6 +451,11 @@ export interface BoardPlugin<R = unknown> {
   commands?: CommandDescriptor[];
   templates?: TemplateDescriptor[];
   references?: ReferenceEntry[];
+  /**
+   * Редакторы объектов: имя (ObjectModule.editor) → компонент. Ядро
+   * открывает его двойным щелчком по объекту или по запросу инструмента.
+   */
+  editors?: Record<string, (props: PluginEditorProps) => R>;
   /** Обработчики заданий Web Worker: имя задания → фабрика воркера. */
   workers?: Record<string, WorkerFactory>;
 }

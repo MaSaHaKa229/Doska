@@ -15,7 +15,7 @@
 
 ## 2. Что сделано
 
-Ветка `stage-1-architecture`; последний коммит кода — `cc9abef` (этап 6.1c), затем коммит с `HANDOFF.md`. Ветка `main` указывает на коммит этапа 1 (`21e5b4a`). Открыт пулл-реквест #1 `stage-1-architecture` → `main`.
+Ветка `stage-1-architecture`; последний коммит кода — `XXXXXXX` (этап 6.2a), затем коммит с `HANDOFF.md`. Ветка `main` указывает на коммит этапа 1 (`21e5b4a`). Открыт пулл-реквест #1 `stage-1-architecture` → `main`.
 
 | Этап | Коммит | Основные файлы |
 |---|---|---|
@@ -26,6 +26,7 @@
 | 3.1. Доски, папки, сервер реального времени | 01efee1 | `backend/src/boards/`, `backend/src/realtime/{guard,room,server,persistence,connection,doc,rate-limit}.ts`, `frontend/src/pages/boards/` |
 | 3.2. Ядро холста | f268dd7 | `frontend/src/{collab,canvas,objects,tools,plugins}/`, `frontend/src/pages/board/` |
 | 3.3. Присутствие, офлайн, привязки, Ctrl+K, справка | 505e9f3 | `frontend/src/collab/{presence,people}.ts`, `frontend/src/canvas/snapping.ts`, `frontend/src/pages/board/{PresenceUi,ViewMenu,Palette,boardCommands}.tsx`, эндпоинт `GET /api/boards/:id/people` |
+| 6.2a. Графики: оси, кривые, слайдеры, таблица, числовая прямая, тригокружность | XXXXXXX | `frontend/src/math/analysis/{plugin.ts,expr.ts,plot.ts,objects.tsx,editor.tsx,tools.tsx}`; `BoardPlugin.editors`, `EditorContext`, `ObjectModule.moveDeps`; `pages/board/PluginEditors.tsx`; `e2e/graphs.cjs` |
 | 6.1c. Линейка, транспортир, циркуль | cc9abef | `frontend/src/math/planimetry/drafting.tsx`; `ObjectModule.guides`/`finishHandle`, `ToolContext.guides` (`packages/shared/src/plugins/types.ts`); перо вдоль края (`tools/draw-tools.tsx`); `e2e/drafting.cjs` |
 | 6.1b. Построения, преобразования, отметки | 1371cc6 | `frontend/src/math/planimetry/{eval.ts,constructions.tsx}`, расширены `objects.tsx`, `geometry.ts`; `BoardPlugin.sections`, `ToolContext.getSelection`; ручки объектов с приоритетом без выделения (`BoardStage.handleAt`); `e2e/constructions.cjs` |
 | 6.1a. Планиметрия: точки, фигуры, динамическая геометрия | 6b27afd | `frontend/src/math/planimetry/{plugin.ts,objects.tsx,tools.tsx,geometry.ts}`; граф зависимостей в `frontend/src/collab/model.ts`; `derived`/`hitPriority`/`unbounded`, `ToolContext.listObjects` в `packages/shared/src/plugins/types.ts`; раздел-кнопка в `pages/board/Panels.tsx`; `e2e/planimetry.cjs` |
@@ -37,7 +38,13 @@
 | 4.2. Задания, главная ученика, миниатюры | 1079aab | `backend/src/assignments/`, `backend/src/boards/work-info.ts`, `backend/src/realtime/state.ts`, `?lite=1` в `realtime/{server,room}.ts`; `frontend/src/pages/assignments/`, `frontend/src/pages/board/WorkBar.tsx`, `frontend/src/canvas/BoardThumbnail.tsx`, `frontend/src/ui/Thumbs.tsx`, `e2e/assignments.cjs` |
 | 4.1. Уроки и права учителя | 5c1abc8 | `backend/src/realtime/lesson.ts`, `room.ts`; `GET /api/directory/users`, `mode` в `PATCH /api/boards/:id`; `frontend/src/pages/board/{LessonUi,LaserLayer,useFollow}.tsx`, `frontend/src/pages/boards/AccessDialog.tsx`, `frontend/src/collab/{laser,follow}.ts`, `frontend/src/tools/availability.ts`, `e2e/` |
 
-Тесты: 76 в `packages/shared`, 115 в `backend`, 133 в `frontend`, 4 в `services/formula-ocr` (`npm run test:ocr`). Все проходят. Сквозные сценарии `e2e/lesson.cjs`, `e2e/assignments.cjs`, `e2e/drawing.cjs`, `e2e/media.cjs`, `e2e/text.cjs`, `e2e/formula.cjs`, `e2e/calc.cjs`, `e2e/planimetry.cjs`, `e2e/constructions.cjs` и `e2e/drafting.cjs` прошли в браузере (см. `e2e/README.md`; подряд все десять упираются в ограничение частоты входов — см. там же).
+Тесты: 76 в `packages/shared`, 115 в `backend`, 145 в `frontend`, 4 в `services/formula-ocr` (`npm run test:ocr`). Все проходят. Сквозные сценарии `e2e/lesson.cjs`, `e2e/assignments.cjs`, `e2e/drawing.cjs`, `e2e/media.cjs`, `e2e/text.cjs`, `e2e/formula.cjs`, `e2e/calc.cjs`, `e2e/planimetry.cjs`, `e2e/constructions.cjs`, `e2e/drafting.cjs` и `e2e/graphs.cjs` прошли в браузере (см. `e2e/README.md`; подряд все одиннадцать упираются в ограничение частоты входов — см. там же).
+
+**Что вошло в 6.2a (6.2 разделён: 6.2a — графики, 6.2b — анализ на графике):**
+- **Плагин `math.analysis`** (`src/math/analysis/`): `expr.ts` — math.js отдельным чанком (`loadMath`, `useMathReady`; опасные функции отключены), школьная запись, разбор вида кривой (`parseCurve`: функция, параметрическая «(x; y)», полярная «r = …», неявная, неравенство) и параметров; `plot.ts` — кадр осей (`frameOf`), значения параметров из слайдеров-опор, построение (`buildPlot`: функция с разрывами на асимптотах, параметрическая/полярная, неявная и граница неравенства — marching squares, закраска неравенства ячейками) с кэшем.
+- **Объекты:** `axes`, `curve` (производный, обрезка по области осей, попадание — только внутри неё), `slider`, `table`, `numberline` (`parseSet`), `trig` (прилипание к отметкам).
+- **Инструменты:** система координат (протяжка или щелчок), график G (диалог), слайдер (первое свободное имя, подключение к ждущим графикам), таблица значений, числовая прямая, тригонометрическая окружность. Диалог графика — редактор плагина: вид кривой и параметры по ходу набора, примеры; недостающие слайдеры создаются под осями.
+- **Ядро:** редакторы плагинов (`BoardPlugin.editors`, `PluginEditorsHost`, `EditorContext`), двойной щелчок открывает любой редактор по имени; `ObjectModule.moveDeps`.
 
 **Что вошло в 6.1c (этап 6.1 завершён):**
 - **Линейка** (`ruler`): деления в клетках, поворот своей ручкой (Shift — 15°), привязка нуля и конца, края — направляющие пера.
@@ -127,7 +134,7 @@
 
 ## 3. Текущее состояние
 
-- **Где остановились.** Подэтап 6.1c закрыт и запушен — этап 6.1 (планиметрия) завершён. Пользователю отправлен план 6.2. Ждём «Продолжай» на 6.2. Незавершённых правок нет.
+- **Где остановились.** Подэтап 6.2a закрыт и запушен. Пользователю отправлен план 6.2b. Ждём «Продолжай» на 6.2b. Незавершённых правок нет.
 - **Не проверено здесь:** образ `services/formula-ocr` не собирался — в этом окружении нет запущенного Docker-демона, а индекс PyTorch закрыт прокси. Обёртка проверена тестами с подставной моделью, бэкенд — с подставным сервисом, браузерный сценарий — с подставным сервисом. Первую настоящую сборку сделать на сервере (этап 9) и проверить распознавание на живой рукописи.
 - **Сломанного не известно.** Плавающий сбой тестов бэкенда найден и исправлен в 5.1 (см. выше).
 - **Точки расширения, которые заполнят следующие этапы (не заглушки):**
@@ -207,6 +214,8 @@
 - **Прямая и луч рисуются отрезком длиной 200 000** и помечены `unbounded`; габарит — опорная часть (иначе «Показать всё» уводило бы в бесконечность).
 - **Привязка к пересечению или середине в инструментах 6.1a ставит свободную точку**; зависимую — инструменты «Точка пересечения» и «Середина» (6.1b).
 - **6.1b: построение — фигура с `evaluate` по геометрии опор, а не отдельный механизм:** одна система габаритов, привязок, отрисовки и пересчёта для всего. Отвергнуто: хранить вычисленные координаты построений в документе — двойной источник истины и запись при каждом движении.
+- **6.2a: график хранит запись, а не точки:** строится у каждого клиента (math.js), в документе — только текст и ссылки на оси и слайдеры. Параметры — объекты-слайдеры в `deps` (перестроение через граф зависимостей ядра). Вид кривой определяется по записи, а не выбирается отдельно.
+- **6.2a: math.js для графиков — тоже отдельный чанк:** доска без графиков его не грузит; до загрузки график не рисуется (компонент перерисуется по `useMathReady`).
 - **6.1c: чертёжные инструменты — объекты доски, а не личные оверлеи:** учитель показывает классу, как приложить транспортир; линейка общая для всех. Дуга циркуля — обычная фигура планиметрии (динамическая, на точке-центре), а не штрих.
 - **Образ фигуры по точкам — из образов вершин** (как в GeoGebra): подписи A′B′C′ и привязка к вершинам образа; построения без точек-вершин — общий тип `image`.
 
@@ -230,10 +239,11 @@
 
 ## 5. Что осталось
 
-1. **6.2–6.5.** Математика — по одному подразделу за ответ (6.2 — графики и анализ, вероятно, в двух частях).
-2. **7.1–7.8.** Физика — по одному подразделу за ответ.
-3. **8.1.** Библиотека шаблонов, справочник формул. **8.2.** Экспорт PNG/SVG/PDF, интерфейс истории версий и восстановление (семантическое, по `docs/SYNC_PROTOCOL.md`, раздел 12).
-4. **9.** Docker Compose (дополнить `docker-compose.yml`, где пока только `formula-ocr`; собрать и проверить образ распознавания), Nginx, certbot, `install.sh` / `update.sh` / `backup.sh` / `restore.sh`, systemd, ротация логов, полный README.
+1. **6.2b.** Анализ на графике: особые точки (точка на графике, корни, экстремумы, пересечения графиков), касательная и секущая, площадь под кривой и между кривыми, суммы Римана, ε-δ, многочлен Тейлора, частичные суммы Фурье.
+2. **6.3–6.5.** Математика — по одному подразделу за ответ.
+3. **7.1–7.8.** Физика — по одному подразделу за ответ.
+4. **8.1.** Библиотека шаблонов, справочник формул. **8.2.** Экспорт PNG/SVG/PDF, интерфейс истории версий и восстановление (семантическое, по `docs/SYNC_PROTOCOL.md`, раздел 12).
+5. **9.** Docker Compose (дополнить `docker-compose.yml`, где пока только `formula-ocr`; собрать и проверить образ распознавания), Nginx, certbot, `install.sh` / `update.sh` / `backup.sh` / `restore.sh`, systemd, ротация логов, полный README.
 
 ## 6. Важные детали
 
@@ -296,6 +306,8 @@ node /home/user/Doska/node_modules/vite/bin/vite.js /home/user/Doska/frontend --
 - `latex-to-mathjs`: аргумент без скобок — один символ, как в LaTeX (`x^23` = x²·3, `\log_2 8`). Десятичная запятая — `2{,}5` и `2,5` между цифрами.
 
 - Инструменты, создающие несколько объектов в одной транзакции, видят их через `ctx.resolve.getObject` только после конца транзакции: модель разбирает изменения в `observeDeep`. Поэтому `createObject` для зависимого объекта в той же транзакции, что и его точки, работает (габарит пересчитывается после транзакции), а читать только что созданные объекты внутри `transact` нельзя.
+- Объект, созданный в текущей транзакции, через `ctx.resolve.getObject` ещё не виден — нужные данные (прямоугольник новых осей) передавать явно (`axesAt` возвращает `rect`).
+- В Konva `Line` с массивом точек рисует ломаную: отдельные отрезки (сетка, таблица) — через `Shape` со `sceneFunc` (`Segments`), иначе появляются соединительные диагонали.
 - `ObjectNode` подписан на запись `model.get(id)`: чтобы перерисовать построение, модель заменяет его запись новым объектом (`{ ...entry }`).
 
 **Git:**

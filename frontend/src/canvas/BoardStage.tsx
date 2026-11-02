@@ -817,7 +817,7 @@ export function BoardStage({ model, stageRef: externalStageRef, sizeRef: externa
         const editor = id ? model.get(id)?.module?.editor : undefined;
         if (!id || !editor) return;
         if (editor === 'text') requestEditText(id);
-        else if (editor === 'formula' || editor === 'solution' || editor === 'calc') requestObjectEditor({ editor, id, at: null });
+        else if (editor) requestObjectEditor({ editor, id, at: null });
       }}
       onPointerLeave={() => {
         presence?.setCursor(null);
