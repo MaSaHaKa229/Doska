@@ -15,7 +15,7 @@
 
 ## 2. Что сделано
 
-Ветка `stage-1-architecture`; последний коммит кода — `XXXXXXX` (этап 6.1b), затем коммит с `HANDOFF.md`. Ветка `main` указывает на коммит этапа 1 (`21e5b4a`). Открыт пулл-реквест #1 `stage-1-architecture` → `main`.
+Ветка `stage-1-architecture`; последний коммит кода — `1371cc6` (этап 6.1b), затем коммит с `HANDOFF.md`. Ветка `main` указывает на коммит этапа 1 (`21e5b4a`). Открыт пулл-реквест #1 `stage-1-architecture` → `main`.
 
 | Этап | Коммит | Основные файлы |
 |---|---|---|
@@ -26,7 +26,7 @@
 | 3.1. Доски, папки, сервер реального времени | 01efee1 | `backend/src/boards/`, `backend/src/realtime/{guard,room,server,persistence,connection,doc,rate-limit}.ts`, `frontend/src/pages/boards/` |
 | 3.2. Ядро холста | f268dd7 | `frontend/src/{collab,canvas,objects,tools,plugins}/`, `frontend/src/pages/board/` |
 | 3.3. Присутствие, офлайн, привязки, Ctrl+K, справка | 505e9f3 | `frontend/src/collab/{presence,people}.ts`, `frontend/src/canvas/snapping.ts`, `frontend/src/pages/board/{PresenceUi,ViewMenu,Palette,boardCommands}.tsx`, эндпоинт `GET /api/boards/:id/people` |
-| 6.1b. Построения, преобразования, отметки | XXXXXXX | `frontend/src/math/planimetry/{eval.ts,constructions.tsx}`, расширены `objects.tsx`, `geometry.ts`; `BoardPlugin.sections`, `ToolContext.getSelection`; ручки объектов с приоритетом без выделения (`BoardStage.handleAt`); `e2e/constructions.cjs` |
+| 6.1b. Построения, преобразования, отметки | 1371cc6 | `frontend/src/math/planimetry/{eval.ts,constructions.tsx}`, расширены `objects.tsx`, `geometry.ts`; `BoardPlugin.sections`, `ToolContext.getSelection`; ручки объектов с приоритетом без выделения (`BoardStage.handleAt`); `e2e/constructions.cjs` |
 | 6.1a. Планиметрия: точки, фигуры, динамическая геометрия | 6b27afd | `frontend/src/math/planimetry/{plugin.ts,objects.tsx,tools.tsx,geometry.ts}`; граф зависимостей в `frontend/src/collab/model.ts`; `derived`/`hitPriority`/`unbounded`, `ToolContext.listObjects` в `packages/shared/src/plugins/types.ts`; раздел-кнопка в `pages/board/Panels.tsx`; `e2e/planimetry.cjs` |
 | 5.3b. Калькулятор, распознавание рукописных формул | ac1476a | `frontend/src/formula/{calc,handwriting}.ts`, `frontend/src/objects/calc.tsx`, `frontend/src/pages/board/{CalcPanel,recognize,useOcrEnabled}.ts(x)`, `frontend/src/api/formula.ts`; `backend/src/formula/ocr.{service,routes}.ts`; `services/formula-ocr/`, `docker-compose.yml` (профиль `ocr`); `e2e/calc.cjs` |
 | 5.3a. Формулы: MathLive, палитра, «Решение» | 88f4e93 | `frontend/src/formula/{palette,mathlive,FormulaDialog,latex-to-mathjs,check}.ts(x)`, `frontend/src/objects/{formula,solution}.tsx`, `frontend/src/tools/formula-tools.tsx`, `frontend/src/pages/board/FormulaEditors.tsx`; плагин шрифтов MathLive в `frontend/vite.config.ts`; `e2e/formula.cjs` |
