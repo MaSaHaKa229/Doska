@@ -12,6 +12,8 @@ export interface FormulaRequest {
   latex: string;
   /** Заголовок диалога («Формула», «Шаг 2» …). */
   title?: string;
+  /** Новый объект: кнопка «Вставить», даже если запись уже заполнена (распознанная рукопись). */
+  insert?: boolean;
 }
 
 /** Кнопка шаблона: формула-пример, отрисованная KaTeX (MathML). */
@@ -126,7 +128,7 @@ export function FormulaDialog({ request, onClose, onSave }: { request: FormulaRe
           <span className="spacer" />
           <Button onClick={onClose}>Отмена</Button>
           <Button type="submit" variant="primary" disabled={!ready || !(code ?? latex).trim()}>
-            {request?.latex ? 'Сохранить' : 'Вставить'}
+            {request?.latex && !request.insert ? 'Сохранить' : 'Вставить'}
           </Button>
         </>
       }

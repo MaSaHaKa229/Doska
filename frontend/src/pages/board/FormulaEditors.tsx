@@ -11,17 +11,43 @@ import { mathElement } from '../../text/schema';
 import { DEFAULT_FORMULA_SIZE, FORMULA_TYPE, formulaSize, type FormulaProps } from '../../objects/formula';
 import { MAX_STEPS, SOLUTION_TYPE, type SolutionProps } from '../../objects/solution';
 import { EDIT_OBJECT_EVENT, type EditObjectDetail } from '../../tools/formula-tools';
+import { CALC_TYPE, type CalcProps } from '../../objects/calc';
+import { latexToMathjs } from '../../formula/latex-to-mathjs';
+import type { CalcResult } from '../../formula/calc';
+import { CalcPanel } from './CalcPanel';
+
+/** Запись для калькулятора из выделенной формулы (если её можно посчитать). */
+function selectedExpression(model: BoardModel): string {
+  const sel = useBoard.getState().selection;
+  if (sel.length !== 1) return '';
+  const o = model.getObject(sel[0]!);
+  if (o?.type === CALC_TYPE) return (o.props as CalcProps).expr;
+  if (o?.type !== FORMULA_TYPE) return '';
+  const latex = String((o.props as FormulaProps).latex);
+  // У равенства «… = ответ» считается левая часть.
+  return latexToMathjs(latex.split('=')[0] ?? '') ?? '';
+}
 
 /**
- * Редакторы формулы и блока «Решение»: открываются инструментом (новый
- * объект в точке щелчка), двойным щелчком по объекту и из Ctrl+K.
+ * Редакторы формулы и блока «Решение» и калькулятор: открываются
+ * инструментом (новый объект в точке щелчка), двойным щелчком по объекту и
+ * из Ctrl+K. Распознанная рукопись открывается в редакторе формулы.
  */
 export function FormulaEditorsHost({ model }: { model: BoardModel }) {
   const [req, setReq] = useState<EditObjectDetail | null>(null);
+  // Калькулятор — отдельная панель: она остаётся открытой рядом с другими редакторами.
+  const [calc, setCalc] = useState<{ id: string | null; at: EditObjectDetail['at']; initial: string } | null>(null);
+  const caps = useBoard((s) => s.caps);
 
   useEffect(() => {
     const onEdit = (e: Event) => {
       const d = (e as CustomEvent<EditObjectDetail>).detail;
+      if (d.editor === 'calc') {
+        const id = d.id && model.canModify(d.id, 'props') ? d.id : null;
+        const initial = d.id ? String((model.getObject(d.id)?.props as CalcProps | undefined)?.expr ?? '') : selectedExpression(model);
+        setCalc({ id, at: d.at, initial });
+        return;
+      }
       if (d.id && !model.canModify(d.id, 'props')) {
         toast.info('Этот объект нельзя изменить');
         return;
@@ -33,17 +59,44 @@ export function FormulaEditorsHost({ model }: { model: BoardModel }) {
   }, [model]);
 
   const pageId = useBoard((s) => s.pageId);
-  const create = <P,>(type: string, props: P, size: { width: number; height: number }): void => {
-    if (!pageId) return;
+  const create = <P,>(type: string, props: P, size: { width: number; height: number }, point = req?.at, replaces: string[] = []): string | null => {
+    if (!pageId) return null;
     const cam = currentCamera();
-    const at = req?.at ?? { x: cam.cx - size.width / 2, y: cam.cy - size.height / 2 };
-    const id = model.createObject(type, { pageId, x: at.x, y: at.y, props });
+    const at = point ?? { x: cam.cx - size.width / 2, y: cam.cy - size.height / 2 };
+    let id: string | null = null;
+    // Новая формула и удаление заменённых штрихов — один шаг отмены.
+    model.transact(() => {
+      id = model.createObject(type, { pageId, x: at.x, y: at.y, props });
+      if (id && replaces.length) model.deleteObjects(replaces);
+    });
     if (id) useBoard.getState().setSelection([id]);
     else toast.info('Нет права добавлять объекты на эту страницу');
+    return id;
+  };
+
+  const insertCalc = (r: CalcResult) => {
+    if (!calc) return;
+    if (calc.id && model.getObject(calc.id)) {
+      model.updateObjects([{ id: calc.id, patch: { props: { expr: r.input, latex: r.latex } } }]);
+      return;
+    }
+    const props: CalcProps = { expr: r.input, latex: r.latex, size: DEFAULT_FORMULA_SIZE, color: useBoard.getState().toolOptions.stroke };
+    const id = create(CALC_TYPE, props, formulaSize(props), calc.at);
+    // Следующий результат встанет ниже предыдущего, а не поверх.
+    if (id) {
+      const b = model.boundsOf([id]);
+      if (b) setCalc((c) => (c ? { ...c, at: { x: b.x, y: b.y + b.height + 8 } } : c));
+    }
   };
 
   const formulaReq: FormulaRequest | null =
-    req?.editor === 'formula' ? { latex: req.id ? String((model.getObject(req.id)?.props as FormulaProps | undefined)?.latex ?? '') : '' } : null;
+    req?.editor === 'formula'
+      ? {
+          latex: req.id ? String((model.getObject(req.id)?.props as FormulaProps | undefined)?.latex ?? '') : (req.latex ?? ''),
+          title: req.replaces?.length ? 'Распознанная формула' : undefined,
+          insert: !req.id,
+        }
+      : null;
   const solution = req?.editor === 'solution' ? (req.id ? (model.getObject(req.id)?.props as SolutionProps | undefined) ?? null : null) : null;
 
   return (
@@ -54,8 +107,8 @@ export function FormulaEditorsHost({ model }: { model: BoardModel }) {
         onSave={(latex) => {
           if (req?.id) model.updateObjects([{ id: req.id, patch: { props: { latex } } }]);
           else {
-            const props: FormulaProps = { latex, size: DEFAULT_FORMULA_SIZE, color: useBoard.getState().toolOptions.stroke };
-            create(FORMULA_TYPE, props, formulaSize(props));
+            const props: FormulaProps = { latex, size: req?.size ?? DEFAULT_FORMULA_SIZE, color: useBoard.getState().toolOptions.stroke };
+            create(FORMULA_TYPE, props, formulaSize(props), req?.at, req?.replaces);
           }
           setReq(null);
         }}
@@ -69,6 +122,14 @@ export function FormulaEditorsHost({ model }: { model: BoardModel }) {
           else create(SOLUTION_TYPE, props, { width: props.w, height: 100 });
           setReq(null);
         }}
+      />
+      <CalcPanel
+        open={!!calc}
+        initial={calc?.initial ?? ''}
+        editing={!!calc?.id}
+        canInsert={!!caps?.write}
+        onClose={() => setCalc(null)}
+        onInsert={insertCalc}
       />
     </>
   );

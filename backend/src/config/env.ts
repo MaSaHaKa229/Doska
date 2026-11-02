@@ -72,6 +72,14 @@ const envSchema = z.object({
   /** Предельный размер загружаемой картинки и PDF, МБ. */
   UPLOAD_MAX_IMAGE_MB: int(15, 1, 200),
   UPLOAD_MAX_PDF_MB: int(50, 1, 500),
+
+  /**
+   * Распознавание рукописных формул: адрес сервиса (свой контейнер pix2tex
+   * из профиля ocr или внешний совместимый). Пусто — функция выключена.
+   */
+  FORMULA_OCR_URL: z.string().default(''),
+  FORMULA_OCR_API_KEY: z.string().default(''),
+  FORMULA_OCR_TIMEOUT_SECONDS: int(30, 1, 300),
 });
 
 export type RawEnv = z.input<typeof envSchema>;
@@ -93,6 +101,8 @@ export interface AppConfig {
     | { driver: 's3'; endpoint: string; region: string; bucket: string; accessKey: string; secretKey: string }
     | { driver: 'fs'; dir: string };
   uploads: { maxImageBytes: number; maxPdfBytes: number };
+  /** null — распознавание формул выключено. */
+  formulaOcr: { url: string; apiKey: string; timeoutMs: number } | null;
 }
 
 export class ConfigError extends Error {}
@@ -119,6 +129,15 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
     }
     if (!e.S3_ACCESS_KEY || !e.S3_SECRET_KEY) throw new ConfigError('Ошибка конфигурации: для S3_ENDPOINT нужны S3_ACCESS_KEY и S3_SECRET_KEY');
   }
+  if (e.FORMULA_OCR_URL) {
+    let u: URL;
+    try {
+      u = new URL(e.FORMULA_OCR_URL);
+    } catch {
+      throw new ConfigError(`Ошибка конфигурации: FORMULA_OCR_URL — неверный адрес «${e.FORMULA_OCR_URL}»`);
+    }
+    if (u.protocol !== 'http:' && u.protocol !== 'https:') throw new ConfigError('Ошибка конфигурации: FORMULA_OCR_URL должен начинаться с http:// или https://');
+  }
   return {
     nodeEnv: e.NODE_ENV,
     host: e.HOST,
@@ -140,5 +159,6 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
       ? { driver: 's3', endpoint: e.S3_ENDPOINT, region: e.S3_REGION, bucket: e.S3_BUCKET, accessKey: e.S3_ACCESS_KEY, secretKey: e.S3_SECRET_KEY }
       : { driver: 'fs', dir: e.UPLOADS_DIR },
     uploads: { maxImageBytes: e.UPLOAD_MAX_IMAGE_MB * 1024 * 1024, maxPdfBytes: e.UPLOAD_MAX_PDF_MB * 1024 * 1024 },
+    formulaOcr: e.FORMULA_OCR_URL ? { url: e.FORMULA_OCR_URL, apiKey: e.FORMULA_OCR_API_KEY, timeoutMs: e.FORMULA_OCR_TIMEOUT_SECONDS * 1000 } : null,
   };
 }

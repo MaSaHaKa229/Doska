@@ -1,0 +1,28 @@
+# Docker Compose учебной доски.
+# Сейчас здесь только необязательный сервис распознавания рукописных формул
+# (профиль ocr). Остальные сервисы (PostgreSQL, MinIO, бэкенд, Nginx, certbot)
+# добавляются на этапе 9.
+#
+#   docker compose --profile ocr up -d formula-ocr
+#   FORMULA_OCR_URL=http://formula-ocr:8502/predict   (бэкенд в той же сети Compose)
+#   FORMULA_OCR_URL=http://127.0.0.1:8502/predict     (бэкенд запущен на самом сервере)
+
+services:
+  formula-ocr:
+    profiles: [ocr]
+    build: ./services/formula-ocr
+    image: doska/formula-ocr:1
+    restart: unless-stopped
+    environment:
+      OCR_API_KEY: ${FORMULA_OCR_API_KEY:-}
+      LOG_LEVEL: INFO
+      # Файловая система только для чтения: кэши библиотек — во временный каталог.
+      HOME: /tmp
+    # Порт только на локальном адресе: сервис не должен быть доступен извне.
+    ports:
+      - "127.0.0.1:8502:8502"
+    # Модель занимает около 1,5 ГБ памяти при работе.
+    mem_limit: 3g
+    read_only: true
+    tmpfs:
+      - /tmp

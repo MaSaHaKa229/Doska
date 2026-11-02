@@ -2,6 +2,9 @@ import type { BoardModel } from '../../collab/model';
 import type { BoardCommands } from './commands';
 import { useBoard } from '../../store/board';
 import { pickFiles } from '../../media/insert';
+import { formulaApi } from '../../api/formula';
+import { handwritingStrokes } from '../../formula/handwriting';
+import { recognizeSelection } from './recognize';
 
 /** Команда доски для палитры Ctrl+K и справки. */
 export interface PaletteCommand {
@@ -19,6 +22,8 @@ export function coreCommands(commands: BoardCommands, model: BoardModel, extra: 
   const st = () => useBoard.getState();
   const hasSel = () => st().selection.length > 0;
   const canWrite = () => !!st().caps?.write;
+  const ocr = { enabled: false };
+  void formulaApi.ocrEnabled().then((v) => (ocr.enabled = v));
   return [
     { id: 'undo', title: 'Отменить', keywords: ['отмена', 'назад', 'undo'], hotkey: 'Ctrl+Z', section: 'Правка', enabled: () => model.undo.canUndo(), run: () => commands.undo() },
     { id: 'redo', title: 'Повторить', keywords: ['вернуть', 'redo'], hotkey: 'Ctrl+Shift+Z', section: 'Правка', enabled: () => model.undo.canRedo(), run: () => commands.redo() },
@@ -39,6 +44,14 @@ export function coreCommands(commands: BoardCommands, model: BoardModel, extra: 
       section: 'Вставка',
       enabled: canWrite,
       run: () => void pickFiles().then((files) => commands.insertFiles(files)),
+    },
+    {
+      id: 'recognize-formula',
+      title: 'Распознать рукописную формулу',
+      keywords: ['распознать', 'рукопись', 'почерк', 'формула', 'ocr'],
+      section: 'Вставка',
+      enabled: () => ocr.enabled && canWrite() && handwritingStrokes(model, st().selection).length > 0,
+      run: () => void recognizeSelection(model),
     },
     { id: 'lock', title: 'Заблокировать / разблокировать', keywords: ['замок', 'закрепить', 'блокировка'], hotkey: 'Ctrl+L', section: 'Упорядочить', enabled: () => hasSel() && !!st().caps?.moderate, run: () => commands.toggleLock() },
     { id: 'zoom-in', title: 'Увеличить', keywords: ['масштаб', 'приблизить', 'зум'], hotkey: 'Ctrl+=', section: 'Вид', enabled: () => true, run: () => commands.zoomStep(1) },

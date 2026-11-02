@@ -6,6 +6,7 @@ import {
   ChevronRight,
   Copy,
   Crop,
+  ScanText,
   Group as GroupIcon,
   Lock,
   Maximize,
@@ -37,6 +38,9 @@ import { Checkbox, SelectField, TextField } from '../../ui/Field';
 import { ActionMenu } from '../../ui/Menu';
 import { InspectorFieldView } from './InspectorFields';
 import { CropDialog } from './MediaUi';
+import { recognizeSelection } from './recognize';
+import { useOcrEnabled } from './useOcrEnabled';
+import { handwritingStrokes } from '../../formula/handwriting';
 import type { BoardCommands } from './commands';
 import type { CanvasTheme } from '../../objects/colors';
 import { toast } from '../../store/toast';
@@ -102,6 +106,8 @@ export function PropertiesBar({ model, commands, theme }: { model: BoardModel; c
   const caps = useBoard((s) => s.caps);
   const pageId = useBoard((s) => s.pageId);
   const [cropping, setCropping] = useState<string | null>(null);
+  const ocrEnabled = useOcrEnabled();
+  const [recognizing, setRecognizing] = useState(false);
   // Перерисовка при изменении выделенных объектов.
   useSyncExternalStore(
     useCallback((cb) => (pageId ? model.subscribePage(pageId, cb) : () => undefined), [model, pageId]),
@@ -167,6 +173,21 @@ export function PropertiesBar({ model, commands, theme }: { model: BoardModel; c
         </Button>
       )}
       <CropDialog model={model} objectId={cropping} onClose={() => setCropping(null)} />
+      {ocrEnabled && caps?.write && handwritingStrokes(model, selection).length > 0 && (
+        <Button
+          size="small"
+          variant="ghost"
+          icon={<ScanText size={16} />}
+          loading={recognizing}
+          title="Превратить рукописную формулу в набранную"
+          onClick={() => {
+            setRecognizing(true);
+            void recognizeSelection(model).finally(() => setRecognizing(false));
+          }}
+        >
+          Распознать формулу
+        </Button>
+      )}
       <div className="spacer" />
       <div className="row" style={{ gap: 2, flexWrap: 'nowrap' }}>
         <Button size="small" variant="ghost" iconOnly icon={<Copy size={16} />} title="Дублировать (Ctrl+D)" aria-label="Дублировать" disabled={!caps?.write} onClick={() => commands.duplicate()} />

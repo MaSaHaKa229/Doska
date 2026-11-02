@@ -10,7 +10,8 @@ import { textModule } from '../objects/text';
 import { textTool } from '../tools/text-tool';
 import { formulaModule, FORMULA_TYPE } from '../objects/formula';
 import { solutionModule } from '../objects/solution';
-import { formulaTool, solutionTool } from '../tools/formula-tools';
+import { calcTool, formulaTool, solutionTool } from '../tools/formula-tools';
+import { calcModule } from '../objects/calc';
 import { allPaletteItems } from '../formula/palette';
 import { mediaTool } from '../tools/media-tool';
 
@@ -22,7 +23,7 @@ import { mediaTool } from '../tools/media-tool';
 export const corePlugin: BoardPlugin<ReactNode> = {
   id: 'core',
   title: 'Основные',
-  objects: [shapeModule, groupModule, strokeModule, imageModule, textModule, formulaModule, solutionModule],
+  objects: [shapeModule, groupModule, strokeModule, imageModule, textModule, formulaModule, solutionModule, calcModule],
   // Шаблоны палитры формул ищутся в Ctrl+K и вставляются готовой формулой.
   commands: allPaletteItems().map((it, n) => ({
     id: `core.formula.insert-${n}`,
@@ -31,7 +32,7 @@ export const corePlugin: BoardPlugin<ReactNode> = {
     keywords: [...it.keywords, 'формула'],
     action: { kind: 'insert' as const, objectType: FORMULA_TYPE, props: { latex: it.example } },
   })),
-  tools: [selectTool, handTool, laserTool, penTool, markerTool, eraserTool, ...(['rect', 'ellipse', 'triangle', 'line', 'arrow'] as const).map(shapeTool), textTool, formulaTool, solutionTool, mediaTool],
+  tools: [selectTool, handTool, laserTool, penTool, markerTool, eraserTool, ...(['rect', 'ellipse', 'triangle', 'line', 'arrow'] as const).map(shapeTool), textTool, formulaTool, solutionTool, calcTool, mediaTool],
 };
 
 /**

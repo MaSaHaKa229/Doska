@@ -15,7 +15,7 @@
 
 ## 2. Что сделано
 
-Ветка `stage-1-architecture`; последний коммит кода — `88f4e93` (этап 5.3a), затем коммит с `HANDOFF.md`. Ветка `main` указывает на коммит этапа 1 (`21e5b4a`). Открыт пулл-реквест #1 `stage-1-architecture` → `main`.
+Ветка `stage-1-architecture`; последний коммит кода — `XXXXXXX` (этап 5.3b), затем коммит с `HANDOFF.md`. Ветка `main` указывает на коммит этапа 1 (`21e5b4a`). Открыт пулл-реквест #1 `stage-1-architecture` → `main`.
 
 | Этап | Коммит | Основные файлы |
 |---|---|---|
@@ -26,6 +26,7 @@
 | 3.1. Доски, папки, сервер реального времени | 01efee1 | `backend/src/boards/`, `backend/src/realtime/{guard,room,server,persistence,connection,doc,rate-limit}.ts`, `frontend/src/pages/boards/` |
 | 3.2. Ядро холста | f268dd7 | `frontend/src/{collab,canvas,objects,tools,plugins}/`, `frontend/src/pages/board/` |
 | 3.3. Присутствие, офлайн, привязки, Ctrl+K, справка | 505e9f3 | `frontend/src/collab/{presence,people}.ts`, `frontend/src/canvas/snapping.ts`, `frontend/src/pages/board/{PresenceUi,ViewMenu,Palette,boardCommands}.tsx`, эндпоинт `GET /api/boards/:id/people` |
+| 5.3b. Калькулятор, распознавание рукописных формул | XXXXXXX | `frontend/src/formula/{calc,handwriting}.ts`, `frontend/src/objects/calc.tsx`, `frontend/src/pages/board/{CalcPanel,recognize,useOcrEnabled}.ts(x)`, `frontend/src/api/formula.ts`; `backend/src/formula/ocr.{service,routes}.ts`; `services/formula-ocr/`, `docker-compose.yml` (профиль `ocr`); `e2e/calc.cjs` |
 | 5.3a. Формулы: MathLive, палитра, «Решение» | 88f4e93 | `frontend/src/formula/{palette,mathlive,FormulaDialog,latex-to-mathjs,check}.ts(x)`, `frontend/src/objects/{formula,solution}.tsx`, `frontend/src/tools/formula-tools.tsx`, `frontend/src/pages/board/FormulaEditors.tsx`; плагин шрифтов MathLive в `frontend/vite.config.ts`; `e2e/formula.cjs` |
 | 5.2b. Текст: форматирование, формулы, таблицы | c8961a3 | `frontend/src/text/{schema,render}.ts`, `frontend/src/objects/text.tsx`, `frontend/src/pages/board/TextEditor.tsx`, `frontend/src/tools/text-tool.tsx`; `ObjectModule.applyResize`; `e2e/text.cjs` |
 | 5.2a. Файлы: хранилище, картинки, PDF как фон | 0748405 | `backend/src/assets/{storage,sniff,assets.service,assets.routes}.ts`; `frontend/src/media/{prepareImage,imageCache,insert,pdf}.ts`, `frontend/src/objects/image.tsx`, `frontend/src/canvas/PdfBackground.tsx`, `frontend/src/pages/board/MediaUi.tsx`, `frontend/src/tools/media-tool.tsx`; `e2e/media.cjs` |
@@ -33,7 +34,15 @@
 | 4.2. Задания, главная ученика, миниатюры | 1079aab | `backend/src/assignments/`, `backend/src/boards/work-info.ts`, `backend/src/realtime/state.ts`, `?lite=1` в `realtime/{server,room}.ts`; `frontend/src/pages/assignments/`, `frontend/src/pages/board/WorkBar.tsx`, `frontend/src/canvas/BoardThumbnail.tsx`, `frontend/src/ui/Thumbs.tsx`, `e2e/assignments.cjs` |
 | 4.1. Уроки и права учителя | 5c1abc8 | `backend/src/realtime/lesson.ts`, `room.ts`; `GET /api/directory/users`, `mode` в `PATCH /api/boards/:id`; `frontend/src/pages/board/{LessonUi,LaserLayer,useFollow}.tsx`, `frontend/src/pages/boards/AccessDialog.tsx`, `frontend/src/collab/{laser,follow}.ts`, `frontend/src/tools/availability.ts`, `e2e/` |
 
-Тесты: 76 в `packages/shared`, 110 в `backend`, 101 в `frontend`. Все проходят. Сквозные сценарии `e2e/lesson.cjs`, `e2e/assignments.cjs`, `e2e/drawing.cjs`, `e2e/media.cjs`, `e2e/text.cjs` и `e2e/formula.cjs` прошли в браузере (см. `e2e/README.md`; подряд все шесть упираются в ограничение частоты входов — см. там же).
+Тесты: 76 в `packages/shared`, 115 в `backend`, 107 в `frontend`, 4 в `services/formula-ocr` (`npm run test:ocr`). Все проходят. Сквозные сценарии `e2e/lesson.cjs`, `e2e/assignments.cjs`, `e2e/drawing.cjs`, `e2e/media.cjs`, `e2e/text.cjs`, `e2e/formula.cjs` и `e2e/calc.cjs` прошли в браузере (см. `e2e/README.md`; подряд все семь упираются в ограничение частоты входов — см. там же).
+
+**Что вошло в 5.3b:**
+- **Калькулятор** (`formula/calc.ts`, math.js отдельным чанком): школьная запись (запятая, «;», tg/ctg/lg/ln, √, °, ×, ÷, :), русские единицы и перевод «в», переменные и функции пользователя, понятные ошибки по-русски. Опасные функции math.js (`import`, `createUnit`, `evaluate`, `parse`…) отключены. Результат — текст и LaTeX «запись = результат» (у перевода единиц показывается только левая часть).
+- **Панель** `CalcPanel` (немодальная, справа): расчёт по мере набора, Enter — в историю, «На доску» и вставка из истории (следующий результат ниже предыдущего), «Обновить на доске» при пересчёте. Инструмент C сразу открывает панель (`onActivate`) и возвращает выделение; без права записи — только считать.
+- **Объект `core.calc`** (`expr`, `latex`, `size`, `color`) — модуль формулы с другим типом и редактором `calc`.
+- **Распознавание:** выделенные штрихи → SVG (всё чёрным на белом, высота строки ~96 px) → PNG → `POST /api/formula-ocr` → бэкенд пересылает на `FORMULA_OCR_URL` (таймаут, ключ, проверка PNG, 2 МБ, 20/мин на пользователя, ошибки сервиса — 503 без подробностей) → редактор формулы «Распознанная формула» → формула на месте рукописи, штрихи удаляются той же транзакцией.
+- **Контейнер** `services/formula-ocr`: обёртка на стандартной библиотеке Python над pix2tex 0.1.4 (PyTorch 2.4.1 для процессора), веса скачиваются при сборке, `/predict` и `/health`, ключ `OCR_API_KEY`, вызовы модели по одному. `docker-compose.yml` пока содержит только этот сервис (профиль `ocr`, порт 127.0.0.1:8502, только чтение).
+- **Попутно:** `ToolModule.onActivate`/`onDeactivate` теперь вызываются при смене инструмента (раньше были объявлены, но не вызывались); у `FormulaRequest` появилось `insert` (кнопка «Вставить» для новой формулы с готовой записью).
 
 **Что вошло в 5.3a (5.3 разделён по согласию пользователя: 5.3a — редактор и «Решение», 5.3b — калькулятор и распознавание):**
 - **Редактор формул** (`FormulaDialog`): MathLive 0.111.1 (визуальный ввод, быстрые сочетания `sqrt`, `frac`, `alpha`, `->`, `<=>`, `+-`, `deg`, `RR` и др., экранная клавиатура внутри `<dialog>`), режим «Код LaTeX», Enter — сохранить. Палитра (`formula/palette.ts`): 8 разделов, у шаблона `template` (с `#?`/`#0`), `example` (кнопка и вставка из Ctrl+K) и ключевые слова. Тот же диалог открывает кнопка Σ в текстовом редакторе (старый `MathDialog` удалён).
@@ -89,7 +98,8 @@
 
 ## 3. Текущее состояние
 
-- **Где остановились.** Подэтап 5.3a закрыт и запушен. Пользователю отправлен план 5.3b. Ждём «Продолжай» на 5.3b. Незавершённых правок нет.
+- **Где остановились.** Подэтап 5.3b закрыт и запушен — этап 5.3 завершён. Пользователю отправлен план 6.1. Ждём «Продолжай» на 6.1. Незавершённых правок нет.
+- **Не проверено здесь:** образ `services/formula-ocr` не собирался — в этом окружении нет запущенного Docker-демона, а индекс PyTorch закрыт прокси. Обёртка проверена тестами с подставной моделью, бэкенд — с подставным сервисом, браузерный сценарий — с подставным сервисом. Первую настоящую сборку сделать на сервере (этап 9) и проверить распознавание на живой рукописи.
 - **Сломанного не известно.** Плавающий сбой тестов бэкенда найден и исправлен в 5.1 (см. выше).
 - **Точки расширения, которые заполнят следующие этапы (не заглушки):**
   - камеры 3D-сцен для «Следуйте за мной»: реестр `frontend/src/collab/follow.ts` (`registerSceneCamera`, `notifySceneCamera`) — сцены регистрируются на этапе 6.4;
@@ -161,6 +171,12 @@
 - **Проверка шагов — числовая подсказка, не символьная система:** без CAS (nerdamer/sympy отвергнуты — вес и неполнота). Неравносильность уравнений не утверждается (`?`, а не `✗`): численно отличить потерю корня от ошибки нельзя.
 - Отметки считаются у каждого клиента, в документ не пишутся.
 
+**Калькулятор и распознавание (5.3b):**
+- **Калькулятор в браузере, а не на сервере:** math.js уже грузится для проверки шагов, сервер не нагружается, работает и без связи.
+- **Свой протокол распознавания (PNG → `{latex}`), а не API pix2tex:** у pix2tex API на FastAPI с multipart и Streamlit — лишние зависимости; простой протокол легко повторить внешним сервисом. Ответ строкой JSON тоже принимается.
+- **Рукопись рендерится в браузере из векторных штрихов** (`toSVG`), а не снимком холста: нет сетки, фона и чужих объектов, масштаб подобран под модель.
+- **Распознанная формула заменяет штрихи**, а не встаёт рядом: так ведут себя похожие доски; отмена одним шагом.
+
 **Файлы (5.2a):**
 - **Файлы отдаёт бэкенд, а не presigned-ссылки MinIO:** нужен вход, MinIO не торчит наружу, хранилище на диске работает так же. Читать файл может любой вошедший пользователь, знающий его случайный UUID. id есть только в документах досок, которые он видит; копии заданий, шаблоны и вставка между досками ссылаются на тот же файл, поэтому привязка «файл — одна доска» не подходит. Загружать можно только на доску с правом записи.
 - **Метаданные удаляются разбором структуры, без `sharp` и перекодирования:** нет нативной зависимости, качество не теряется. Перекодирование делает браузер перед загрузкой — это и поворот по EXIF, и защита на случай загрузки в обход интерфейса.
@@ -175,11 +191,10 @@
 
 ## 5. Что осталось
 
-1. **5.3b.** Калькулятор на math.js (единицы измерения, результат на доску объектом `core.calc`), распознавание рукописных формул: свой контейнер pix2tex (профиль `ocr`), `FORMULA_OCR_URL`, пустая переменная выключает функцию.
-2. **6.1–6.5.** Математика — по одному подразделу за ответ.
-3. **7.1–7.8.** Физика — по одному подразделу за ответ.
-4. **8.1.** Библиотека шаблонов, справочник формул. **8.2.** Экспорт PNG/SVG/PDF, интерфейс истории версий и восстановление (семантическое, по `docs/SYNC_PROTOCOL.md`, раздел 12).
-5. **9.** Docker Compose, Nginx, certbot, `install.sh` / `update.sh` / `backup.sh` / `restore.sh`, systemd, ротация логов, полный README.
+1. **6.1–6.5.** Математика — по одному подразделу за ответ.
+2. **7.1–7.8.** Физика — по одному подразделу за ответ.
+3. **8.1.** Библиотека шаблонов, справочник формул. **8.2.** Экспорт PNG/SVG/PDF, интерфейс истории версий и восстановление (семантическое, по `docs/SYNC_PROTOCOL.md`, раздел 12).
+4. **9.** Docker Compose (дополнить `docker-compose.yml`, где пока только `formula-ocr`; собрать и проверить образ распознавания), Nginx, certbot, `install.sh` / `update.sh` / `backup.sh` / `restore.sh`, systemd, ротация логов, полный README.
 
 ## 6. Важные детали
 
@@ -214,7 +229,7 @@ SEED_ADMIN_PASSWORD=Start2026doska
 cd backend && set -a && . ../.env && set +a && NODE_ENV=production COOKIE_SECURE=false node dist/src/main.js
 node /home/user/Doska/node_modules/vite/bin/vite.js /home/user/Doska/frontend --port 5173 --strictPort
 ```
-Перед первым запуском бэкенда — `npm run build -w @doska/backend`.
+Перед первым запуском бэкенда — `npm run build -w @doska/backend`. Для `e2e/calc.cjs` бэкенд запускать с `FORMULA_OCR_URL=http://127.0.0.1:8599/predict`.
 
 **Подводные камни окружения:**
 - `cd` внутри фоновых команд игнорируется. `npx vite` из корня запускает Vite не для того каталога — фронтенд обслуживает корень репозитория и отдаёт 404.

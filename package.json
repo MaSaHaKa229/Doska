@@ -21,7 +21,8 @@
     "dev:backend": "npm run dev -w @doska/backend",
     "db:migrate": "npm run db:migrate -w @doska/backend",
     "db:seed": "npm run db:seed -w @doska/backend",
-    "dev:frontend": "npm run dev -w @doska/frontend"
+    "dev:frontend": "npm run dev -w @doska/frontend",
+    "test:ocr": "cd services/formula-ocr && python3 -m unittest test_server"
   },
   "overrides": {
     "vite": "6.4.5"

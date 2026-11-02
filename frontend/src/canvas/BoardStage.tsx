@@ -328,6 +328,13 @@ export function BoardStage({ model, stageRef: externalStageRef, sizeRef: externa
     };
   }, [model]);
 
+  // Смена инструмента: onDeactivate прежнего и onActivate нового.
+  useEffect(() => {
+    const tool = registry.getTool(toolId);
+    tool?.onActivate?.(toolCtx);
+    return () => tool?.onDeactivate?.(toolCtx);
+  }, [toolId, toolCtx]);
+
   const tool = registry.getTool(toolId);
 
   // ----- Указатель -----
@@ -740,7 +747,7 @@ export function BoardStage({ model, stageRef: externalStageRef, sizeRef: externa
         const editor = id ? model.get(id)?.module?.editor : undefined;
         if (!id || !editor) return;
         if (editor === 'text') requestEditText(id);
-        else if (editor === 'formula' || editor === 'solution') requestObjectEditor({ editor, id, at: null });
+        else if (editor === 'formula' || editor === 'solution' || editor === 'calc') requestObjectEditor({ editor, id, at: null });
       }}
       onPointerLeave={() => {
         presence?.setCursor(null);

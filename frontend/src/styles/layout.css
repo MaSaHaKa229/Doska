@@ -1081,3 +1081,81 @@ kbd {
 .solution-step .input {
   flex: 1;
 }
+
+/* ----- Калькулятор (5.3b) ----- */
+.calc-panel {
+  position: fixed;
+  right: 16px;
+  top: 104px;
+  z-index: 40;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: min(380px, calc(100vw - 32px));
+  max-height: calc(100dvh - 140px);
+  padding: 10px 12px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-l);
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: var(--shadow-2);
+  overflow-y: auto;
+}
+.calc-panel__header {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.calc-panel__header h2 {
+  flex: 1;
+  margin: 0;
+  font-size: 1rem;
+}
+.calc-panel__result {
+  min-height: 1.6em;
+  font-size: 1.25rem;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.calc-panel__result--error {
+  font-size: 0.9rem;
+  font-weight: 400;
+  color: var(--danger);
+}
+.calc-panel__history {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border-top: 1px solid var(--border);
+  padding-top: 6px;
+}
+.calc-panel__history li {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.calc-panel__line {
+  flex: 1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 8px;
+  padding: 4px 6px;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+}
+.calc-panel__line:hover {
+  background: var(--surface-2);
+}
+.calc-panel__value {
+  font-weight: 600;
+}
+.calc-panel p {
+  margin: 0;
+}

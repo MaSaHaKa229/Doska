@@ -21,6 +21,7 @@ import { adminRoutes } from './admin/admin.routes.js';
 import { boardsRoutes } from './boards/boards.routes.js';
 import { assignmentsRoutes } from './assignments/assignments.routes.js';
 import { assetsRoutes } from './assets/assets.routes.js';
+import { formulaOcrRoutes } from './formula/ocr.routes.js';
 import { createStorage } from './assets/storage.js';
 import { registerRealtime, type RealtimeOptions } from './realtime/server.js';
 
@@ -82,6 +83,7 @@ export async function buildApp({ config, prisma, extend, realtime }: BuildAppOpt
   await app.register(boardsRoutes, { prefix: '/api' });
   await app.register(assignmentsRoutes, { prefix: '/api' });
   await app.register(assetsRoutes, { prefix: '/api' });
+  await app.register(formulaOcrRoutes, { prefix: '/api' });
   registerRealtime(app, realtime);
 
   if (extend) await extend(app);
