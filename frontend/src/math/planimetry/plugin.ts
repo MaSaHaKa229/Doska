@@ -1,23 +1,93 @@
 import type { ReactNode } from 'react';
-import { ArrowRightFromLine, ChartPie, CircleDot, CircleSlash, Dot, Egg, Hexagon, MoveHorizontal, Pentagon, Rainbow, Slash, Waypoints } from 'lucide-react';
+import {
+  ArrowDownToLine,
+  ArrowRightFromLine,
+  Asterisk,
+  ChartPie,
+  ChevronLeft,
+  Circle,
+  CircleArrowOutUpRight,
+  CircleDashed,
+  CircleDot,
+  CircleSlash,
+  CornerDownRight,
+  Crosshair,
+  Dot,
+  Egg,
+  Equal,
+  FlipHorizontal2,
+  GitCommitVertical,
+  Hash,
+  Hexagon,
+  MoveHorizontal,
+  MoveRight,
+  Pentagon,
+  Radius,
+  Rainbow,
+  RotateCcw,
+  Ruler,
+  Scaling,
+  Slash,
+  SplitSquareHorizontal,
+  Waypoints,
+  X,
+} from 'lucide-react';
 import type { BoardPlugin } from '@doska/shared';
 import { registerIcons } from '../../ui/icons';
-import { figureModules, pointModule, PLUGIN_ID } from './objects';
+import { angleModule, cpointModule, figureModules, pointModule, PLUGIN_ID, ticksModule } from './objects';
 import { figureTools, pointTool } from './tools';
+import { constructionTools, markTools, SECTION_CONSTRUCT, SECTION_MARKS, SECTION_TRANSFORM, transformTools } from './constructions';
 
-registerIcons({ ArrowRightFromLine, ChartPie, CircleDot, CircleSlash, Dot, Egg, Hexagon, MoveHorizontal, Pentagon, Rainbow, Slash, Waypoints });
+registerIcons({
+  ArrowDownToLine,
+  ArrowRightFromLine,
+  Asterisk,
+  ChartPie,
+  ChevronLeft,
+  Circle,
+  CircleArrowOutUpRight,
+  CircleDashed,
+  CircleDot,
+  CircleSlash,
+  CornerDownRight,
+  Crosshair,
+  Dot,
+  Egg,
+  Equal,
+  FlipHorizontal2,
+  GitCommitVertical,
+  Hash,
+  Hexagon,
+  MoveHorizontal,
+  MoveRight,
+  Pentagon,
+  Radius,
+  Rainbow,
+  RotateCcw,
+  Ruler,
+  Scaling,
+  Slash,
+  SplitSquareHorizontal,
+  Waypoints,
+  X,
+});
 
 /**
- * Планиметрия (этап 6.1a): точки и фигуры на точках — динамическая
- * геометрия. Фигура ссылается на точки через deps и перестраивается, когда
- * их двигают. Построения, преобразования и отметки — 6.1b, чертёжные
- * инструменты — 6.1c.
+ * Планиметрия: точки и фигуры на точках — динамическая геометрия (6.1a);
+ * зависимые точки, построения, преобразования, отметки и измерения (6.1b).
+ * Объект ссылается на опоры через deps и перестраивается, когда их двигают.
+ * Чертёжные инструменты (линейка, транспортир, циркуль) — 6.1c.
  */
 const plugin: BoardPlugin<ReactNode> = {
   id: PLUGIN_ID,
   title: 'Планиметрия',
-  objects: [pointModule, ...figureModules],
-  tools: [pointTool, ...figureTools],
+  sections: {
+    [SECTION_CONSTRUCT]: 'Построения',
+    [SECTION_TRANSFORM]: 'Преобразования',
+    [SECTION_MARKS]: 'Отметки и измерения',
+  },
+  objects: [pointModule, cpointModule, ...figureModules, angleModule, ticksModule],
+  tools: [pointTool, ...figureTools, ...constructionTools, ...transformTools, ...markTools],
 };
 
 export default plugin;

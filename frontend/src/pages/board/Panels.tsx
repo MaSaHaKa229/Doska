@@ -132,7 +132,7 @@ function SectionFlyout({
   }, [open]);
   const current = tools.find((t) => t.id === last) ?? tools[0]!;
   const Icon = toolIcon(current.icon);
-  const title = registry.listPlugins().find((p) => p.id === section)?.title ?? section;
+  const title = registry.listPlugins().reduce<string | null>((t, p) => t ?? p.sections?.[section] ?? (p.id === section ? p.title : null), null) ?? section;
   const active = tools.some((t) => t.id === activeId);
   return (
     <>

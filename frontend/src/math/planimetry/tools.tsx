@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import { Circle, Group, Line } from 'react-konva';
 import type { InspectorField, Point, ToolContext, ToolModule, ToolPointerEvent } from '@doska/shared';
 import { arcPoints, dist, ellipsePoints, polar } from './geometry';
+import { CPOINT_TYPE, geomOfId, isPointType } from './eval';
 import { FIGURES, PLUGIN_ID, POINT_TYPE, figureType, pointModule, type FigureDef, type FigureProps, type FigureShape, type PointProps } from './objects';
 
 /** Пункт построения: существующая точка или новая (создаётся при завершении). */
@@ -14,14 +15,14 @@ interface Preview {
   n: number;
 }
 
-interface ToolOptionsView {
+export interface ToolOptionsView {
   stroke: string;
   strokeWidth: number;
   dash: 'solid' | 'dashed' | 'dotted';
   polygonSides?: number;
 }
 
-const STYLE_OPTIONS: InspectorField[] = [
+export const STYLE_OPTIONS: InspectorField[] = [
   { kind: 'color', key: 'stroke', label: 'Цвет' },
   { kind: 'stroke-width', key: 'strokeWidth', label: 'Толщина' },
   { kind: 'line-style', key: 'dash', label: 'Линия' },
@@ -52,22 +53,28 @@ export function nextLabels(used: Iterable<string>, count: number): string[] {
   return out;
 }
 
-function usedLabels(ctx: ToolContext): string[] {
-  return ctx.listObjects(POINT_TYPE).map((o) => String((o.props as PointProps).label ?? ''));
+export function usedLabels(ctx: ToolContext): string[] {
+  return [...ctx.listObjects(POINT_TYPE), ...ctx.listObjects(CPOINT_TYPE)].map((o) => String((o.props as PointProps).label ?? ''));
 }
 
-/** Точка под курсором: привязка к существующей точке (refId) или к ближайшей точке на допуске. */
-function existingPoint(e: ToolPointerEvent, ctx: ToolContext): string | null {
+/** Точка под курсором (свободная или зависимая): привязка к точке (refId) или попадание. */
+export function existingPoint(e: ToolPointerEvent, ctx: ToolContext): string | null {
   const ref = e.snap?.refId ? ctx.resolve.getObject(e.snap.refId) : undefined;
-  if (ref?.type === POINT_TYPE) return ref.id;
-  const hit = ctx.hitTest(e.world, ctx.screenToWorld(8)).find((o) => o.type === POINT_TYPE);
+  if (ref && isPointType(ref.type) && geomOfId(ref.id, ctx.resolve)) return ref.id;
+  const hit = ctx.hitTest(e.world, ctx.screenToWorld(8)).find((o) => isPointType(o.type));
   return hit?.id ?? null;
+}
+
+/** Положение точки-объекта. */
+export function pointPos(id: string, ctx: ToolContext): Point | null {
+  const g = geomOfId(id, ctx.resolve);
+  return g?.kind === 'point' ? g.p : null;
 }
 
 function pickAt(e: ToolPointerEvent, ctx: ToolContext): Pick {
   const id = existingPoint(e, ctx);
-  const o = id ? ctx.resolve.getObject(id) : undefined;
-  return o ? { id: o.id, at: { x: o.x, y: o.y } } : { id: null, at: e.snapped };
+  const at = id ? pointPos(id, ctx) : null;
+  return id && at ? { id, at } : { id: null, at: e.snapped };
 }
 
 /**
@@ -125,7 +132,10 @@ function ghostShape(def: FigureDef, pts: Point[], n: number): FigureShape | null
     }
     return null;
   }
-  return def.shape(pts, { color: 'ink', width: 2, dash: 'solid', label: '', fill: false, fb: [], n });
+  return def.evaluate(
+    pts.map((p) => ({ kind: 'point' as const, p })),
+    { color: 'ink', width: 2, dash: 'solid', label: '', fill: false, fb: [], n },
+  );
 }
 
 function ghostPoints(s: FigureShape, far: number): { pts: Point[]; closed: boolean } {
@@ -175,7 +185,7 @@ function renderPreview(ctx: ToolContext): ReactNode {
 //  Инструменты
 // ---------------------------------------------------------------------
 
-const section = PLUGIN_ID;
+export const section = PLUGIN_ID;
 
 export const pointTool: ToolModule<ReactNode> = {
   id: `${PLUGIN_ID}.point`,
@@ -322,4 +332,4 @@ function figureTool(def: FigureDef): ToolModule<ReactNode> {
   };
 }
 
-export const figureTools = FIGURES.map(figureTool);
+export const figureTools = FIGURES.filter((f) => f.points !== undefined).map(figureTool);

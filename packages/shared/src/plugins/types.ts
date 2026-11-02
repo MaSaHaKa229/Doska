@@ -303,6 +303,8 @@ export interface ToolContext {
   /** Объекты текущей страницы (по типу или все) — например, чтобы выбрать свободную подпись точки. */
   listObjects(type?: string): BoardObject[];
   setSelection(ids: string[]): void;
+  /** Текущее выделение (например, фигуры для преобразования, выбранные до инструмента). */
+  getSelection(): string[];
   /** Предпросмотр (рисуется в оверлее и транслируется в awareness.drawing). */
   setPreview(preview: unknown | null): void;
   /** Текущий предпросмотр инструмента (для renderOverlay). */
@@ -401,6 +403,12 @@ export interface BoardPlugin<R = unknown> {
   title: string;
   /** Плагины, которые должны быть зарегистрированы раньше (общие объекты). */
   dependsOn?: string[];
+  /**
+   * Названия подразделов инструментов (ToolModule.section) внутри плагина:
+   * «math.planimetry.constructions» → «Построения». Подраздел с id самого
+   * плагина называется его title.
+   */
+  sections?: Record<string, string>;
   objects?: ObjectModule<any, R>[];
   tools?: ToolModule<R>[];
   commands?: CommandDescriptor[];

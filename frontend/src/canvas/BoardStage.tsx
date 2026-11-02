@@ -334,6 +334,7 @@ export function BoardStage({ model, stageRef: externalStageRef, sizeRef: externa
           .map((id) => model.getObject(id))
           .filter((o): o is BoardObject => !!o),
       setSelection: (ids) => s().setSelection(ids),
+      getSelection: () => s().selection,
       setPreview: (p) => s().setPreview(p),
       getPreview: <T,>() => s().preview as T | null,
       activateTool: (id) => s().setTool(id),
@@ -392,14 +393,23 @@ export function BoardStage({ model, stageRef: externalStageRef, sizeRef: externa
     timeStamp: e.timeStamp,
   });
 
-  /** Ручка (конец отрезка и т. п.) под курсором у единственного выделенного объекта. */
+  /**
+   * Ручка под курсором: у единственного выделенного объекта (конец отрезка
+   * и т. п.) или у объекта с приоритетом попадания под курсором (точку на
+   * окружности тянут сразу, без предварительного выделения).
+   */
   const handleAt = (world: Point): { objectId: string; handleId: string } | null => {
-    if (selection.length !== 1 || !caps?.write) return null;
-    const e = model.get(selection[0]!);
-    if (!e?.module || e.broken || !e.module.dragHandle || !model.canModify(e.obj.id, 'props')) return null;
+    if (!caps?.write || !pageId) return null;
     const tol = 8 / currentCamera().zoom;
-    for (const h of e.module.getHandles(e.obj, model.resolve)) {
-      if (Math.hypot(h.position.x - world.x, h.position.y - world.y) <= tol) return { objectId: e.obj.id, handleId: h.id };
+    const candidates = selection.length === 1 ? [selection[0]!] : [];
+    const top = model.hitTest(pageId, world, tol)[0];
+    if (top && top !== candidates[0] && (model.get(top)?.module?.hitPriority ?? 0) > 0) candidates.push(top);
+    for (const id of candidates) {
+      const e = model.get(id);
+      if (!e?.module || e.broken || !e.module.dragHandle || !model.canModify(e.obj.id, 'props')) continue;
+      for (const h of e.module.getHandles(e.obj, model.resolve)) {
+        if (Math.hypot(h.position.x - world.x, h.position.y - world.y) <= tol) return { objectId: e.obj.id, handleId: h.id };
+      }
     }
     return null;
   };
@@ -465,6 +475,7 @@ export function BoardStage({ model, stageRef: externalStageRef, sizeRef: externa
       const handle = handleAt(world);
       if (handle) {
         model.undo.stopCapturing(); // жест ручки — один шаг отмены
+        if (!useBoard.getState().selection.includes(handle.objectId)) useBoard.getState().setSelection([handle.objectId]);
         interaction.current = { kind: 'handle', ...handle, pointerId: e.pointerId };
         return;
       }

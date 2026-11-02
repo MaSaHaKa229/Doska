@@ -5,7 +5,8 @@ import { BoardModel } from '../../collab/model';
 import { registry } from '../../plugins/registry';
 import { useBoard } from '../../store/board';
 import { arcGeom, distToArc, ellipseGeom, polygonArea, regularPolygon } from './geometry';
-import { POINT_TYPE, figureType, type FigureProps, type PointProps } from './objects';
+import { ANGLE_TYPE, CPOINT_TYPE, POINT_TYPE, TICKS_TYPE, angleArc, figureType, fmt, measureText, type CPointProps, type FigureProps, type PointProps } from './objects';
+import { geomOfId, isPointType } from './eval';
 import { nextLabels } from './tools';
 
 const T = '11111111-1111-4111-8111-111111111111';
@@ -42,6 +43,7 @@ function setup() {
     listObjects: (type) => model.pageObjects(pageId).map((id) => model.getObject(id)).filter((o): o is BoardObject => !!o && (!type || o.type === type)),
     hitTest: (pt, tol) => model.hitTest(pageId, pt, tol).map((id) => model.getObject(id)).filter((o): o is BoardObject => !!o),
     setSelection: (ids) => (selection = ids),
+    getSelection: () => selection,
     setPreview: (p) => (preview = p),
     getPreview: <P,>() => preview as P | null,
     activateTool: () => undefined,
@@ -64,6 +66,7 @@ const ev = (x: number, y: number, refId?: string): ToolPointerEvent => ({
 /** Щелчки инструментом по точкам. */
 function clicks(tool: string, ctx: ToolContext, pts: [number, number][]) {
   const t = registry.getTool(`math.planimetry.${tool}`)!;
+  t.onActivate?.(ctx);
   for (const [x, y] of pts) {
     t.onPointerDown?.(ev(x, y), ctx);
     t.onPointerUp?.(ev(x, y), ctx);
@@ -207,5 +210,257 @@ describe('построения и зависимости', () => {
     const copy = segs.find((s) => s.id !== seg.id)!;
     expect(copy.deps.every((d) => !seg.deps.includes(d))).toBe(true);
     expect(model.boundsOf([copy.id])!.y).toBeGreaterThan(40);
+  });
+});
+
+// =====================================================================
+//  6.1b
+// =====================================================================
+
+const geom = (model: BoardModel, id: string) => geomOfId(id, model.resolve);
+const pos = (model: BoardModel, id: string) => {
+  const g = geom(model, id);
+  if (g?.kind !== 'point') throw new Error('не точка: ' + id);
+  return g.p;
+};
+const byLabel = (model: BoardModel, pageId: string, label: string) =>
+  model.pageObjects(pageId).map((id) => model.getObject(id)!).find((o) => isPointType(o.type) && (o.props as PointProps).label === label)!;
+
+/** Треугольник A(0,0) B(120,0) C(0,90) — прямоугольный, гипотенуза 150. */
+function triangle() {
+  const env = setup();
+  clicks('polygon', env.ctx, [[0, 0], [120, 0], [0, 90], [0, 0]]);
+  const tri = ofType(env.model, env.pageId, figureType('polygon'))[0]!;
+  return { ...env, tri, A: byLabel(env.model, env.pageId, 'A'), B: byLabel(env.model, env.pageId, 'B'), C: byLabel(env.model, env.pageId, 'C') };
+}
+
+describe('6.1b: зависимые точки', () => {
+  it('пересечение двух прямых следует за точками', () => {
+    const { model, ctx, pageId } = setup();
+    clicks('line', ctx, [[0, 0], [100, 100]]);
+    clicks('line', ctx, [[0, 100], [100, 0]]);
+    clicks('intersection', ctx, [[50, 50]]);
+    const [x] = ofType(model, pageId, CPOINT_TYPE);
+    expect(pos(model, x!.id)).toEqual({ x: 50, y: 50 });
+    const b = byLabel(model, pageId, 'B');
+    model.updateObjects([{ id: b.id, patch: { x: 100, y: 0 } }]);
+    // Первая прямая теперь y = 0 → пересечение со второй в (100, 0).
+    expect(pos(model, x!.id).x).toBeCloseTo(100);
+    expect(pos(model, x!.id).y).toBeCloseTo(0);
+    // Параллельные — точки нет, объект остаётся и вернётся.
+    model.updateObjects([{ id: b.id, patch: { x: 100, y: -100 } }]);
+    expect(geom(model, x!.id)).toBeNull();
+  });
+
+  it('пересечение прямой и окружности выбором двух линий — обе точки', () => {
+    const { model, ctx, pageId } = setup();
+    clicks('circle', ctx, [[0, 0], [50, 0]]);
+    clicks('line', ctx, [[-100, 0], [-90, 0]]);
+    const circle = ofType(model, pageId, figureType('circle'))[0]!;
+    const line = ofType(model, pageId, figureType('line'))[0]!;
+    const tool = registry.getTool('math.planimetry.intersection')!;
+    tool.onActivate!(ctx);
+    // По окружности (вверху) и по прямой (вдали от пересечений).
+    tool.onPointerDown!(ev(0, -50), ctx);
+    tool.onPointerDown!(ev(200, 0), ctx);
+    const pts = ofType(model, pageId, CPOINT_TYPE).map((o) => pos(model, o.id));
+    expect(pts.map((p) => Math.round(p.x)).sort((a, b) => a - b)).toEqual([-50, 50]);
+    expect(ofType(model, pageId, CPOINT_TYPE).every((o) => o.deps.join() === [circle.id, line.id].join())).toBe(true);
+  });
+
+  it('середина отрезка щелчком по отрезку; точка на окружности тянется вдоль неё', () => {
+    const { model, ctx, pageId } = setup();
+    clicks('segment', ctx, [[0, 0], [100, 0]]);
+    clicks('midpoint', ctx, [[30, 0]]);
+    const m = ofType(model, pageId, CPOINT_TYPE)[0]!;
+    expect((m.props as CPointProps).label).toBe('M');
+    expect(pos(model, m.id)).toEqual({ x: 50, y: 0 });
+    clicks('circle', ctx, [[300, 0], [340, 0]]);
+    clicks('point-on', ctx, [[300, -40]]);
+    const on = ofType(model, pageId, CPOINT_TYPE).find((o) => (o.props as CPointProps).kind === 'on')!;
+    expect(pos(model, on.id).y).toBeCloseTo(-40);
+    const mod = registry.getObjectModule(CPOINT_TYPE)!;
+    const patch = mod.dragHandle!(model.getObject(on.id)!, 't', { x: 400, y: 0 }, { shift: false, alt: false, ctrl: false }, model.resolve)!;
+    model.updateObjects([{ id: on.id, patch }]);
+    expect(pos(model, on.id).x).toBeCloseTo(340);
+    expect(pos(model, on.id).y).toBeCloseTo(0);
+  });
+
+  it('замечательные точки треугольника щелчком по нему', () => {
+    const { model, ctx, pageId } = triangle();
+    for (const t of ['centroid', 'orthocenter', 'incenter', 'circumcenter']) clicks(t, ctx, [[60, 0.5]]);
+    const get = (kind: string) => ofType(model, pageId, CPOINT_TYPE).find((o) => (o.props as CPointProps).kind === kind)!;
+    expect(pos(model, get('centroid').id)).toEqual({ x: 40, y: 30 });
+    // Прямоугольный треугольник: ортоцентр — вершина прямого угла, центр описанной — середина гипотенузы.
+    expect(pos(model, get('orthocenter').id).x).toBeCloseTo(0);
+    expect(pos(model, get('orthocenter').id).y).toBeCloseTo(0);
+    expect(pos(model, get('circumcenter').id)).toEqual({ x: 60, y: 45 });
+    // r = (a + b − c) / 2 = (120 + 90 − 150) / 2 = 30.
+    expect(pos(model, get('incenter').id).x).toBeCloseTo(30);
+    expect(['M', 'H', 'I', 'O']).toEqual(['centroid', 'orthocenter', 'incenter', 'circumcenter'].map((k) => (get(k).props as CPointProps).label));
+  });
+});
+
+describe('6.1b: построения', () => {
+  it('перпендикуляр и параллельная через точку', () => {
+    const { model, ctx, pageId } = setup();
+    clicks('segment', ctx, [[0, 0], [100, 50]]);
+    clicks('perpendicular', ctx, [[200, 200], [50, 25]]);
+    clicks('parallel', ctx, [[200, 200], [50, 25]]);
+    const perp = geom(model, ofType(model, pageId, figureType('perpendicular'))[0]!.id)!;
+    const par = geom(model, ofType(model, pageId, figureType('parallel'))[0]!.id)!;
+    if (perp.kind !== 'linear' || par.kind !== 'linear') throw new Error('не прямая');
+    const d = (g: { a: { x: number; y: number }; b: { x: number; y: number } }) => ({ x: g.b.x - g.a.x, y: g.b.y - g.a.y });
+    expect(d(perp).x * 100 + d(perp).y * 50).toBeCloseTo(0);
+    expect(d(par).x * 50 - d(par).y * 100).toBeCloseTo(0);
+    // Обе через одну и ту же новую точку C.
+    expect(ofType(model, pageId, POINT_TYPE)).toHaveLength(3);
+  });
+
+  it('касательные из внешней точки: две, точка касания на окружности', () => {
+    const { model, ctx, pageId } = setup();
+    clicks('circle', ctx, [[0, 0], [30, 0]]);
+    clicks('tangent', ctx, [[100, 0], [0, -30]]);
+    const tans = ofType(model, pageId, figureType('tangent'));
+    expect(tans).toHaveLength(2);
+    for (const t of tans) {
+      const g = geom(model, t.id)!;
+      if (g.kind !== 'linear') throw new Error('не прямая');
+      expect(Math.hypot(g.b.x, g.b.y)).toBeCloseTo(30);
+      // Радиус в точку касания перпендикулярен касательной.
+      expect((g.b.x - g.a.x) * g.b.x + (g.b.y - g.a.y) * g.b.y).toBeCloseTo(0);
+    }
+  });
+
+  it('медиана, высота, вписанная и описанная окружности', () => {
+    const { model, ctx, pageId } = triangle();
+    clicks('median', ctx, [[0, 90], [0, 0], [120, 0]]);
+    clicks('altitude', ctx, [[0, 0], [120, 0], [0, 90]]);
+    clicks('incircle', ctx, [[60, 0.5]]);
+    clicks('circumcircle', ctx, [[60, 0.5]]);
+    const med = geom(model, ofType(model, pageId, figureType('median'))[0]!.id)!;
+    const alt = geom(model, ofType(model, pageId, figureType('altitude'))[0]!.id)!;
+    const inc = geom(model, ofType(model, pageId, figureType('incircle'))[0]!.id)!;
+    const circ = geom(model, ofType(model, pageId, figureType('circumcircle'))[0]!.id)!;
+    expect(med.kind === 'linear' && med.b).toEqual({ x: 60, y: 0 });
+    // Высота из A на гипотенузу BC: длина = 120·90/150 = 72.
+    expect(alt.kind === 'linear' && Math.hypot(alt.b.x - alt.a.x, alt.b.y - alt.a.y)).toBeCloseTo(72);
+    expect(inc.kind === 'circle' && inc.r).toBeCloseTo(30);
+    expect(circ.kind === 'circle' && circ.r).toBeCloseTo(75);
+    // Нет новых точек: использованы вершины треугольника.
+    expect(ofType(model, pageId, POINT_TYPE)).toHaveLength(3);
+  });
+
+  it('удаление вершины уносит всю цепочку построений', () => {
+    const { model, ctx, pageId, A } = triangle();
+    clicks('circumcenter', ctx, [[60, 0.5]]);
+    const o = ofType(model, pageId, CPOINT_TYPE)[0]!;
+    clicks('circle', ctx, [[60, 45], [0, 0]]);
+    expect(model.dependentsOf([A.id]).length).toBeGreaterThanOrEqual(3);
+    model.deleteObjects([A.id, ...model.dependentsOf([A.id])]);
+    expect(model.getObject(o.id)).toBeUndefined();
+    expect(ofType(model, pageId, figureType('circle'))).toHaveLength(0);
+  });
+});
+
+describe('6.1b: преобразования', () => {
+  it('осевая симметрия треугольника: вершины A′B′C′, образ следует за оригиналом', () => {
+    const { model, ctx, pageId, tri, B } = triangle();
+    clicks('line', ctx, [[200, -100], [200, 100]]);
+    const axis = ofType(model, pageId, figureType('line'))[0]!;
+    ctx.setSelection([]);
+    const tool = registry.getTool('math.planimetry.reflect-line')!;
+    tool.onActivate!(ctx);
+    tool.onPointerDown!(ev(60, 0.5), ctx);
+    tool.onPointerDown!(ev(200, 0), ctx);
+    const imgs = ofType(model, pageId, figureType('polygon')).filter((o) => o.id !== tri.id);
+    expect(imgs).toHaveLength(1);
+    expect(imgs[0]!.deps.map((d) => (model.getObject(d)!.props as CPointProps).label)).toEqual(['A′', 'B′', 'C′']);
+    const b1 = byLabel(model, pageId, 'B′');
+    expect(pos(model, b1.id)).toEqual({ x: 280, y: 0 });
+    model.updateObjects([{ id: B.id, patch: { x: 150, y: 0 } }]);
+    expect(pos(model, b1.id).x).toBeCloseTo(250);
+    expect(axis.deps).toHaveLength(2);
+  });
+
+  it('поворот выделенного отрезка на 90°, гомотетия окружности с k = 2, перенос на вектор', () => {
+    const { model, ctx, pageId, selected } = setup();
+    clicks('segment', ctx, [[100, 0], [200, 0]]);
+    const seg = selected()[0]!;
+    // Выделение до выбора инструмента — источник; щелчок — центр поворота (новая точка).
+    useBoard.getState().setToolOptions({ rotateAngle: 90 } as never, false);
+    const rot = registry.getTool('math.planimetry.rotate')!;
+    rot.onActivate!(ctx);
+    rot.onPointerDown!(ev(0, 0), ctx);
+    const segs = ofType(model, pageId, figureType('segment')).filter((o) => o.id !== seg);
+    expect(segs).toHaveLength(1);
+    const g = geom(model, segs[0]!.id)!;
+    // Против часовой стрелки на экране (ось y вниз): (100, 0) → (0, −100).
+    expect(g.kind === 'linear' && Math.round(g.a.x)).toBe(0);
+    expect(g.kind === 'linear' && Math.round(g.a.y)).toBe(-100);
+
+    clicks('circle', ctx, [[500, 0], [520, 0]]);
+    const circle = selected()[0]!;
+    useBoard.getState().setToolOptions({ homothetyK: 2 } as never, false);
+    const hom = registry.getTool('math.planimetry.homothety')!;
+    hom.onActivate!(ctx);
+    hom.onPointerDown!(ev(500, 200), ctx);
+    const circles = ofType(model, pageId, figureType('circle')).filter((o) => o.id !== circle);
+    const cg = geom(model, circles[0]!.id)!;
+    expect(cg.kind === 'circle' && cg.r).toBeCloseTo(40);
+
+    clicks('vector', ctx, [[0, 300], [30, 340]]);
+    ctx.setSelection([]);
+    const tr = registry.getTool('math.planimetry.translate')!;
+    tr.onActivate!(ctx);
+    tr.onPointerDown!(ev(150, 0), ctx); // исходный отрезок
+    tr.onPointerDown!(ev(15, 320), ctx); // вектор
+    const moved = ofType(model, pageId, figureType('segment')).map((o) => geom(model, o.id)!).find((x) => x.kind === 'linear' && Math.round(x.a.x) === 130);
+    expect(moved && moved.kind === 'linear' && Math.round(moved.a.y)).toBe(40);
+  });
+
+  it('образ построения (перпендикуляра) — фигура «образ»', () => {
+    const { model, ctx, pageId } = setup();
+    clicks('segment', ctx, [[0, 0], [100, 0]]);
+    clicks('perpendicular', ctx, [[50, 50], [20, 0]]);
+    const perp = ofType(model, pageId, figureType('perpendicular'))[0]!;
+    ctx.setSelection([perp.id]);
+    const tool = registry.getTool('math.planimetry.reflect-point')!;
+    tool.onActivate!(ctx);
+    tool.onPointerDown!(ev(100, 50), ctx);
+    const img = ofType(model, pageId, figureType('image'))[0]!;
+    const g = geom(model, img.id)!;
+    expect(g.kind === 'linear' && Math.round(g.a.x)).toBe(150);
+  });
+});
+
+describe('6.1b: отметки и измерения', () => {
+  it('отметка угла: величина и прямой угол', () => {
+    const { model, ctx, pageId, B } = triangle();
+    clicks('angle-mark', ctx, [[120, 0], [0, 0], [0, 90]]);
+    const mark = ofType(model, pageId, ANGLE_TYPE)[0]!;
+    const [a, b, c] = mark.deps.map((d) => pos(model, d));
+    expect(angleArc(a!, b!, c!, false).deg).toBeCloseTo(90);
+    model.updateObjects([{ id: B.id, patch: { x: 120, y: 90 } }]);
+    const [a2, b2, c2] = mark.deps.map((d) => pos(model, d));
+    // Угол между (120, 90) и (0, 90): cos = 0,6.
+    expect(angleArc(a2!, b2!, c2!, false).deg).toBeCloseTo(53.13, 1);
+    expect(angleArc(a2!, b2!, c2!, true).deg).toBeCloseTo(306.87, 1);
+    expect(model.hitTest(pageId, { x: 10, y: 20 }, 3)).toContain(mark.id);
+  });
+
+  it('штрихи равенства на отрезке и инструмент «Размер»', () => {
+    const { model, ctx, pageId } = setup();
+    clicks('segment', ctx, [[0, 0], [100, 0]]);
+    clicks('equal-ticks', ctx, [[30, 0]]);
+    const ticks = ofType(model, pageId, TICKS_TYPE)[0]!;
+    expect(ticks.deps).toEqual([ofType(model, pageId, figureType('segment'))[0]!.id]);
+    const seg = ofType(model, pageId, figureType('segment'))[0]!;
+    clicks('measure', ctx, [[70, 0]]);
+    expect((model.getObject(seg.id)!.props as FigureProps).measure).toBe(true);
+    const g = geom(model, seg.id)!;
+    expect(g.kind !== 'point' && measureText(g)).toBe('5');
+    expect(measureText({ kind: 'poly', pts: [{ x: 0, y: 0 }, { x: 40, y: 0 }, { x: 0, y: 40 }], closed: true })).toBe('S = 2');
+    expect(fmt(2.345)).toBe('2,35');
   });
 });
