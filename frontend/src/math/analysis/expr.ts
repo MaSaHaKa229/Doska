@@ -8,11 +8,14 @@ import type { MathNode, MathJsInstance } from 'mathjs';
 
 let math: MathJsInstance | null = null;
 let loading: Promise<void> | null = null;
+let derivative: ((node: MathNode, v: string) => MathNode) | null = null;
 const waiters = new Set<() => void>();
 
 export function loadMath(): Promise<void> {
   loading ??= import('mathjs').then(({ create, all }) => {
     const m = create(all!, { number: 'number' });
+    // Символьная производная нужна ядру анализа (касательная, Тейлор), но не записям на доске.
+    derivative = m.derivative.bind(m) as unknown as typeof derivative;
     // Выражения с доски не должны менять сам math.js.
     const blocked = (name: string) => () => {
       throw new Error(`Функция ${name} недоступна`);
@@ -62,6 +65,8 @@ export interface ParsedCurve {
   params: string[];
   /** Запись для подписи графика. */
   caption: string;
+  /** Функция: дерево выражения f(x) (для символьных производных). */
+  node?: MathNode;
 }
 
 export const KIND_TITLES: Record<CurveKind, string> = {
@@ -186,18 +191,18 @@ function parseUncached(m: MathJsInstance, text: string): ParsedCurve {
     }
     if (/^(y|[a-zA-Z]\s*\(\s*x\s*\))$/.test(lhs)) {
       const f = compile(m, rhs);
-      return { kind: 'function', f: f.fn, params: symbols([f.node]), caption };
+      return { kind: 'function', f: f.fn, params: symbols([f.node]), caption, node: f.node };
     }
     if (rhs === 'y') {
       const f = compile(m, lhs);
-      return { kind: 'function', f: f.fn, params: symbols([f.node]), caption };
+      return { kind: 'function', f: f.fn, params: symbols([f.node]), caption, node: f.node };
     }
     const l = compile(m, lhs);
     const r = compile(m, rhs);
     return { kind: 'implicit', f: (s) => l.fn(s) - r.fn(s), params: symbols([l.node, r.node]), caption };
   }
   const f = compile(m, src);
-  return { kind: 'function', f: f.fn, params: symbols([f.node]), caption: `y = ${caption}` };
+  return { kind: 'function', f: f.fn, params: symbols([f.node]), caption: `y = ${caption}`, node: f.node };
 }
 
 /** Подходящий шаг делений: 1, 2, 5 × 10ⁿ не меньше минимального. */
@@ -212,4 +217,41 @@ export function fmtNum(v: number, digits = 4): string {
   if (!Number.isFinite(v)) return v > 0 ? '∞' : v < 0 ? '−∞' : '—';
   const r = Math.abs(v) < 1e-12 ? 0 : Number(v.toPrecision(digits));
   return String(r).replace('.', ',').replace('-', '−');
+}
+
+const derivCache = new Map<string, ((scope: Record<string, number>) => number)[]>();
+
+/**
+ * Производные функции по x порядков 0…order (символьно, math.js). null —
+ * не удалось (запись не функция или производная не берётся).
+ */
+export function derivatives(c: ParsedCurve, order: number): ((scope: Record<string, number>) => number)[] | null {
+  if (!math || !derivative || c.kind !== 'function' || !c.node) return null;
+  const key = c.caption;
+  const list = derivCache.get(key) ?? [c.f];
+  if (list.length <= order) {
+    // Достраиваем недостающие порядки дифференцированием с нуля (дерево не кэшируется).
+    try {
+      let node = c.node;
+      for (let k = 1; k <= order; k++) {
+        node = derivative(node, 'x');
+        if (k >= list.length) {
+          const code = node.compile();
+          list.push((scope) => {
+            try {
+              const v = code.evaluate({ ...scope });
+              return typeof v === 'number' ? v : NaN;
+            } catch {
+              return NaN;
+            }
+          });
+        }
+      }
+    } catch {
+      return null;
+    }
+  }
+  if (derivCache.size > 200) derivCache.clear();
+  derivCache.set(key, list);
+  return list.slice(0, order + 1);
 }

@@ -15,7 +15,7 @@
 
 ## 2. Что сделано
 
-Ветка `stage-1-architecture`; последний коммит кода — `e011d8f` (этап 6.2a), затем коммит с `HANDOFF.md`. Ветка `main` указывает на коммит этапа 1 (`21e5b4a`). Открыт пулл-реквест #1 `stage-1-architecture` → `main`.
+Ветка `stage-1-architecture`; последний коммит кода — `XXXXXXX` (этап 6.2b), затем коммит с `HANDOFF.md`. Ветка `main` указывает на коммит этапа 1 (`21e5b4a`). Открыт пулл-реквест #1 `stage-1-architecture` → `main`.
 
 | Этап | Коммит | Основные файлы |
 |---|---|---|
@@ -26,6 +26,7 @@
 | 3.1. Доски, папки, сервер реального времени | 01efee1 | `backend/src/boards/`, `backend/src/realtime/{guard,room,server,persistence,connection,doc,rate-limit}.ts`, `frontend/src/pages/boards/` |
 | 3.2. Ядро холста | f268dd7 | `frontend/src/{collab,canvas,objects,tools,plugins}/`, `frontend/src/pages/board/` |
 | 3.3. Присутствие, офлайн, привязки, Ctrl+K, справка | 505e9f3 | `frontend/src/collab/{presence,people}.ts`, `frontend/src/canvas/snapping.ts`, `frontend/src/pages/board/{PresenceUi,ViewMenu,Palette,boardCommands}.tsx`, эндпоинт `GET /api/boards/:id/people` |
+| 6.2b. Анализ на графике | XXXXXXX | `frontend/src/math/analysis/{calculus.ts,features.tsx,calculus-tools.tsx}`, `derivatives` в `expr.ts`; `e2e/calculus.cjs` |
 | 6.2a. Графики: оси, кривые, слайдеры, таблица, числовая прямая, тригокружность | e011d8f | `frontend/src/math/analysis/{plugin.ts,expr.ts,plot.ts,objects.tsx,editor.tsx,tools.tsx}`; `BoardPlugin.editors`, `EditorContext`, `ObjectModule.moveDeps`; `pages/board/PluginEditors.tsx`; `e2e/graphs.cjs` |
 | 6.1c. Линейка, транспортир, циркуль | cc9abef | `frontend/src/math/planimetry/drafting.tsx`; `ObjectModule.guides`/`finishHandle`, `ToolContext.guides` (`packages/shared/src/plugins/types.ts`); перо вдоль края (`tools/draw-tools.tsx`); `e2e/drafting.cjs` |
 | 6.1b. Построения, преобразования, отметки | 1371cc6 | `frontend/src/math/planimetry/{eval.ts,constructions.tsx}`, расширены `objects.tsx`, `geometry.ts`; `BoardPlugin.sections`, `ToolContext.getSelection`; ручки объектов с приоритетом без выделения (`BoardStage.handleAt`); `e2e/constructions.cjs` |
@@ -38,7 +39,12 @@
 | 4.2. Задания, главная ученика, миниатюры | 1079aab | `backend/src/assignments/`, `backend/src/boards/work-info.ts`, `backend/src/realtime/state.ts`, `?lite=1` в `realtime/{server,room}.ts`; `frontend/src/pages/assignments/`, `frontend/src/pages/board/WorkBar.tsx`, `frontend/src/canvas/BoardThumbnail.tsx`, `frontend/src/ui/Thumbs.tsx`, `e2e/assignments.cjs` |
 | 4.1. Уроки и права учителя | 5c1abc8 | `backend/src/realtime/lesson.ts`, `room.ts`; `GET /api/directory/users`, `mode` в `PATCH /api/boards/:id`; `frontend/src/pages/board/{LessonUi,LaserLayer,useFollow}.tsx`, `frontend/src/pages/boards/AccessDialog.tsx`, `frontend/src/collab/{laser,follow}.ts`, `frontend/src/tools/availability.ts`, `e2e/` |
 
-Тесты: 76 в `packages/shared`, 115 в `backend`, 145 в `frontend`, 4 в `services/formula-ocr` (`npm run test:ocr`). Все проходят. Сквозные сценарии `e2e/lesson.cjs`, `e2e/assignments.cjs`, `e2e/drawing.cjs`, `e2e/media.cjs`, `e2e/text.cjs`, `e2e/formula.cjs`, `e2e/calc.cjs`, `e2e/planimetry.cjs`, `e2e/constructions.cjs`, `e2e/drafting.cjs` и `e2e/graphs.cjs` прошли в браузере (см. `e2e/README.md`; подряд все одиннадцать упираются в ограничение частоты входов — см. там же).
+Тесты: 76 в `packages/shared`, 115 в `backend`, 152 в `frontend`, 4 в `services/formula-ocr` (`npm run test:ocr`). Все проходят. Сквозные сценарии `e2e/lesson.cjs`, `e2e/assignments.cjs`, `e2e/drawing.cjs`, `e2e/media.cjs`, `e2e/text.cjs`, `e2e/formula.cjs`, `e2e/calc.cjs`, `e2e/planimetry.cjs`, `e2e/constructions.cjs`, `e2e/drafting.cjs`, `e2e/graphs.cjs` и `e2e/calculus.cjs` прошли в браузере (см. `e2e/README.md`; подряд все двенадцать упираются в ограничение частоты входов — см. там же).
+
+**Что вошло в 6.2b (этап 6.2 завершён):**
+- **Вычисления** (`calculus.ts`): `graphOf` (функция графика с параметрами слайдеров и кадр осей; только вид «функция»), нули (смена знака + деление пополам, касания через экстремумы |f|, разрывы отсекаются), экстремумы (смена знака производной), производная (символьная `derivatives` из `expr.ts` — внутренняя ссылка на `math.derivative`, недоступная записям; иначе разностная), интеграл Симпсона, суммы Римана (4 способа), Тейлор (коэффициенты по символьным производным), Фурье (коэффициенты Симпсоном по периоду).
+- **Объекты** (`features.tsx`, общий `featureModule`): точка на графике (тянется без выделения), нули, экстремумы, пересечения двух графиков, касательная, секущая, площадь под графиком и между графиками, суммы Римана, ε-δ, Тейлор, Фурье. Все — производные от графика(ов), рисуются с обрезкой по осям, подписи-плашки сдвигаются внутрь области (`FrameContext`), параметры меняются ручками и на панели свойств; `moveDeps: () => []`.
+- **Инструменты** (`calculus-tools.tsx`, подраздел «Анализ на графике»): щелчок по графику функции, для пересечений и площади между графиками — по двум; начальные значения от точки щелчка.
 
 **Что вошло в 6.2a (6.2 разделён: 6.2a — графики, 6.2b — анализ на графике):**
 - **Плагин `math.analysis`** (`src/math/analysis/`): `expr.ts` — math.js отдельным чанком (`loadMath`, `useMathReady`; опасные функции отключены), школьная запись, разбор вида кривой (`parseCurve`: функция, параметрическая «(x; y)», полярная «r = …», неявная, неравенство) и параметров; `plot.ts` — кадр осей (`frameOf`), значения параметров из слайдеров-опор, построение (`buildPlot`: функция с разрывами на асимптотах, параметрическая/полярная, неявная и граница неравенства — marching squares, закраска неравенства ячейками) с кэшем.
@@ -134,7 +140,7 @@
 
 ## 3. Текущее состояние
 
-- **Где остановились.** Подэтап 6.2a закрыт и запушен. Пользователю отправлен план 6.2b. Ждём «Продолжай» на 6.2b. Незавершённых правок нет.
+- **Где остановились.** Подэтап 6.2b закрыт и запушен — этап 6.2 завершён. Пользователю отправлен план 6.3. Ждём «Продолжай» на 6.3. Незавершённых правок нет.
 - **Не проверено здесь:** образ `services/formula-ocr` не собирался — в этом окружении нет запущенного Docker-демона, а индекс PyTorch закрыт прокси. Обёртка проверена тестами с подставной моделью, бэкенд — с подставным сервисом, браузерный сценарий — с подставным сервисом. Первую настоящую сборку сделать на сервере (этап 9) и проверить распознавание на живой рукописи.
 - **Сломанного не известно.** Плавающий сбой тестов бэкенда найден и исправлен в 5.1 (см. выше).
 - **Точки расширения, которые заполнят следующие этапы (не заглушки):**
@@ -239,15 +245,14 @@
 
 ## 5. Что осталось
 
-1. **6.2b.** Анализ на графике: особые точки (точка на графике, корни, экстремумы, пересечения графиков), касательная и секущая, площадь под кривой и между кривыми, суммы Римана, ε-δ, многочлен Тейлора, частичные суммы Фурье.
-2. **6.3–6.5.** Математика — по одному подразделу за ответ.
-3. **7.1–7.8.** Физика — по одному подразделу за ответ.
-4. **8.1.** Библиотека шаблонов, справочник формул. **8.2.** Экспорт PNG/SVG/PDF, интерфейс истории версий и восстановление (семантическое, по `docs/SYNC_PROTOCOL.md`, раздел 12).
-5. **9.** Docker Compose (дополнить `docker-compose.yml`, где пока только `formula-ocr`; собрать и проверить образ распознавания), Nginx, certbot, `install.sh` / `update.sh` / `backup.sh` / `restore.sh`, systemd, ротация логов, полный README.
+1. **6.3–6.5.** Математика — по одному подразделу за ответ (6.3 — аналитическая геометрия и линейная алгебра).
+2. **7.1–7.8.** Физика — по одному подразделу за ответ.
+3. **8.1.** Библиотека шаблонов, справочник формул. **8.2.** Экспорт PNG/SVG/PDF, интерфейс истории версий и восстановление (семантическое, по `docs/SYNC_PROTOCOL.md`, раздел 12).
+4. **9.** Docker Compose (дополнить `docker-compose.yml`, где пока только `formula-ocr`; собрать и проверить образ распознавания), Nginx, certbot, `install.sh` / `update.sh` / `backup.sh` / `restore.sh`, systemd, ротация логов, полный README.
 
 ## 6. Важные детали
 
-**Подготовка окружения.** PostgreSQL 16 установлен локально, но после перезапуска контейнера остановлен.
+**Подготовка окружения.** PostgreSQL 16 установлен локально, но после перезапуска контейнера остановлен (признак — вход отвечает 500, в журнале бэкенда «Can't reach database server»).
 ```bash
 service postgresql start
 cd /home/user/Doska
