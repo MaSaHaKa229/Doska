@@ -83,6 +83,8 @@ export const pointPropsSchema = z.object({
   ...pointStyle,
   /** Создана инструментом вместе с построением: удаляется вместе с ним, если больше никому не нужна. */
   auto: z.boolean(),
+  /** Невидимая опора (концы дуги, начерченной циркулем): не рисуется и не выбирается. */
+  ghost: z.boolean().optional(),
 });
 export type PointProps = z.infer<typeof pointPropsSchema>;
 type PointObject = BoardObject<PointProps>;
@@ -124,12 +126,12 @@ export const pointModule: ObjectModule<PointProps, ReactNode> = {
   serialize: (o) => o,
   deserialize: (raw) => raw as unknown as PointObject,
   // Подпись входит в габарит: её видно при «Показать всё» и выделении рамкой.
-  getLocalBounds: (o) => pointBounds(o.props.label),
-  hitTest: (o, point, tolerance) => dist(point, o) <= tolerance + 4,
+  getLocalBounds: (o) => (o.props.ghost ? { x: 0, y: 0, width: 0, height: 0 } : pointBounds(o.props.label)),
+  hitTest: (o, point, tolerance) => !o.props.ghost && dist(point, o) <= tolerance + 4,
   getHandles: () => [],
-  getSnapPoints: (o) => [{ kind: 'anchor', point: { x: o.x, y: o.y }, refId: o.id }],
-  render: (o, ctx) => <PointShape at={{ x: 0, y: 0 }} label={o.props.label} color={o.props.color} size={o.props.size} ctx={ctx} />,
-  toSVG: (o, ctx) => pointSvg(o, o.props.label, ctx.resolveColor(o.props.color), o.props.size),
+  getSnapPoints: (o) => (o.props.ghost ? [] : [{ kind: 'anchor', point: { x: o.x, y: o.y }, refId: o.id }]),
+  render: (o, ctx) => (o.props.ghost ? null : <PointShape at={{ x: 0, y: 0 }} label={o.props.label} color={o.props.color} size={o.props.size} ctx={ctx} />),
+  toSVG: (o, ctx) => (o.props.ghost ? '' : pointSvg(o, o.props.label, ctx.resolveColor(o.props.color), o.props.size)),
   inspector: POINT_INSPECTOR,
   transform: { rotatable: false, resize: 'none' },
   hitPriority: 10,

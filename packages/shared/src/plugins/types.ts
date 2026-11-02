@@ -170,6 +170,18 @@ export interface ObjectModule<P = Record<string, JsonValue>, R = unknown> {
     ctx: ResolveContext,
   ): ObjectPatch<P> | null;
 
+  /**
+   * Завершение жеста ручки (отпускание): побочные действия через API
+   * инструмента — например, циркуль ставит начерченную дугу. Выполняется в
+   * том же шаге отмены, что и сам жест.
+   */
+  finishHandle?(obj: BoardObject<P>, handleId: string, ctx: ToolContext): void;
+  /**
+   * Прямые края (мировые координаты), вдоль которых перо рисует ровную линию:
+   * линейка, угольник. Штрих, начатый у края, проецируется на него.
+   */
+  guides?(obj: BoardObject<P>, ctx: ResolveContext): { a: Point; b: Point }[];
+
   /** Точки привязки (концы, середины, центры…) в мировых координатах. */
   getSnapPoints?(obj: BoardObject<P>, ctx: ResolveContext): SnapPoint[];
   /** Кривые для вычисления пересечений с другими объектами. */
@@ -302,6 +314,8 @@ export interface ToolContext {
   hitTest(point: Point, tolerance: number): BoardObject[];
   /** Объекты текущей страницы (по типу или все) — например, чтобы выбрать свободную подпись точки. */
   listObjects(type?: string): BoardObject[];
+  /** Прямые края-направляющие объектов текущей страницы (ObjectModule.guides). */
+  guides(): { a: Point; b: Point }[];
   setSelection(ids: string[]): void;
   /** Текущее выделение (например, фигуры для преобразования, выбранные до инструмента). */
   getSelection(): string[];

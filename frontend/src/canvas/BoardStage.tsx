@@ -328,6 +328,16 @@ export function BoardStage({ model, stageRef: externalStageRef, sizeRef: externa
           .pageObjects(s().pageId ?? '')
           .map((id) => model.getObject(id))
           .filter((o): o is BoardObject => !!o && (!type || o.type === type)),
+      guides: () =>
+        model.pageObjects(s().pageId ?? '').flatMap((id) => {
+          const e = model.get(id);
+          if (!e?.module?.guides || e.broken || e.obj.hidden) return [];
+          try {
+            return e.module.guides(e.obj, model.resolve);
+          } catch {
+            return [];
+          }
+        }),
       hitTest: (pt, tol) =>
         model
           .hitTest(s().pageId ?? '', pt, tol)
@@ -590,7 +600,9 @@ export function BoardStage({ model, stageRef: externalStageRef, sizeRef: externa
     }
     if (it.kind === 'handle' && it.pointerId === e.pointerId) {
       const entry = model.get(it.objectId);
-      const snap = snapPoint(world, e.altKey, new Set([it.objectId]));
+      // Ручка с snap: false (поворот, вращение циркуля) не привязывается.
+      const wantsSnap = entry?.module?.getHandles(entry.obj, model.resolve).find((h) => h.id === it.handleId)?.snap !== false;
+      const snap = wantsSnap ? snapPoint(world, e.altKey, new Set([it.objectId])) : null;
       useBoard.getState().setSnapHint(snap && snap.kind !== 'grid' ? snap : null);
       const target = snap?.point ?? world;
       const patch = entry?.module?.dragHandle?.(entry.obj, it.handleId, target, { shift: e.shiftKey, alt: e.altKey, ctrl: e.ctrlKey }, model.resolve);
@@ -685,6 +697,12 @@ export function BoardStage({ model, stageRef: externalStageRef, sizeRef: externa
       case 'tool':
         tool?.onPointerUp?.(toolEvent(e, world), toolCtx);
         break;
+      case 'handle': {
+        // Завершение жеста ручки — в том же шаге отмены.
+        const entry = model.get(it.objectId);
+        if (entry?.module?.finishHandle) model.transact(() => entry.module!.finishHandle!(entry.obj, it.handleId, toolCtx), { merge: true });
+        break;
+      }
       case 'laser':
         laser?.up();
         break;

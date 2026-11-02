@@ -20,6 +20,31 @@ export const PEN_TOOL_ID = 'core.pen';
 export const MARKER_TOOL_ID = 'core.marker';
 export const ERASER_TOOL_ID = 'core.eraser';
 
+/** Начать штрих «по линейке» можно не дальше этого расстояния от края (экранные пт). */
+const GUIDE_PX = 16;
+
+type Guide = { a: Point; b: Point };
+
+/** Ближайший к точке край-направляющая в пределах допуска. */
+export function nearestGuide(guides: Guide[], p: Point, tol: number): Guide | null {
+  let best: { g: Guide; d: number } | null = null;
+  for (const g of guides) {
+    const q = projectOnGuide(g, p);
+    const d = Math.hypot(q.x - p.x, q.y - p.y);
+    if (d <= tol && (!best || d < best.d)) best = { g, d };
+  }
+  return best?.g ?? null;
+}
+
+/** Проекция точки на край (в пределах его длины). */
+export function projectOnGuide(g: Guide, p: Point): Point {
+  const dx = g.b.x - g.a.x;
+  const dy = g.b.y - g.a.y;
+  const l2 = dx * dx + dy * dy;
+  const t = l2 ? Math.min(1, Math.max(0, ((p.x - g.a.x) * dx + (p.y - g.a.y) * dy) / l2)) : 0;
+  return { x: g.a.x + dx * t, y: g.a.y + dy * t };
+}
+
 /** Задержка пера на месте, после которой штрих распознаётся как фигура. */
 export const RECOGNIZE_HOLD_MS = 600;
 /** Сырые точки одного штриха; длиннее — штрих сохраняется и продолжается новым. */
@@ -137,6 +162,8 @@ function strokeTool(kind: 'pen' | 'marker'): ToolModule<ReactNode> {
   let holdAnchor: Point | null = null;
   let recognized: RecognizedShape | null = null;
   let penWidthPx = 3;
+  /** Край линейки, вдоль которого идёт текущий штрих. */
+  let guide: Guide | null = null;
 
   const clearHold = () => {
     if (holdTimer) clearTimeout(holdTimer);
@@ -165,6 +192,7 @@ function strokeTool(kind: 'pen' | 'marker'): ToolModule<ReactNode> {
 
   const end = (ctx: ToolContext) => {
     clearHold();
+    guide = null;
     builder = null;
     style = null;
     recognized = null;
@@ -202,19 +230,27 @@ function strokeTool(kind: 'pen' | 'marker'): ToolModule<ReactNode> {
     onPointerDown(e, ctx) {
       const o = ctx.getToolOptions<ToolOptions>();
       penWidthPx = o.penWidth;
+      // Штрих, начатый у края линейки, идёт ровно вдоль него.
+      guide = nearestGuide(ctx.guides(), e.world, ctx.screenToWorld(GUIDE_PX));
+      const start = guide ? projectOnGuide(guide, e.world) : e.world;
       const px = ctx.screenToWorld(1);
       style = pen
         ? { width: o.penWidth * px, color: o.stroke, opacity: 1, pressure: true }
         : { width: Number(o.markerWidth) * px, color: o.markerColor, opacity: 0.35, pressure: false };
       builder = new StrokeBuilder(px * 0.75, pen ? 0.45 : 0.6);
-      builder.add(e.world.x, e.world.y, e.pressure);
+      builder.add(start.x, start.y, e.pressure);
       recognized = null;
-      armHold(ctx, e.world);
+      if (!guide) armHold(ctx, e.world);
       update(ctx);
     },
     onPointerMove(e, ctx) {
       if (!builder || !style) return;
-      if (!builder.add(e.world.x, e.world.y, e.pressure)) return;
+      const at = guide ? projectOnGuide(guide, e.world) : e.world;
+      if (!builder.add(at.x, at.y, e.pressure)) return;
+      if (guide) {
+        update(ctx);
+        return;
+      }
       // Перо сдвинулось — распознавание откладывается до новой задержки.
       if (holdAnchor && Math.hypot(e.world.x - holdAnchor.x, e.world.y - holdAnchor.y) > ctx.screenToWorld(4)) {
         recognized = null;
@@ -238,7 +274,8 @@ function strokeTool(kind: 'pen' | 'marker'): ToolModule<ReactNode> {
       ctx.transact(() => {
         if (r) commitRecognized(ctx, r, { color: s.color, penWidth: penWidthPx, worldWidth: s.width });
         else {
-          b.finish(e.world.x, e.world.y, e.pressure);
+          const at = guide ? projectOnGuide(guide, e.world) : e.world;
+          b.finish(at.x, at.y, e.pressure);
           commitStroke(ctx, b.points, { ...s, kind }, pen ? 'top' : 'bottom');
         }
       });

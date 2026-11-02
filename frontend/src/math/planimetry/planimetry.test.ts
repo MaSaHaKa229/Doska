@@ -7,6 +7,7 @@ import { useBoard } from '../../store/board';
 import { arcGeom, distToArc, ellipseGeom, polygonArea, regularPolygon } from './geometry';
 import { ANGLE_TYPE, CPOINT_TYPE, POINT_TYPE, TICKS_TYPE, angleArc, figureType, fmt, measureText, type CPointProps, type FigureProps, type PointProps } from './objects';
 import { geomOfId, isPointType } from './eval';
+import { COMPASS_TYPE, PROTRACTOR_TYPE, RULER_TYPE } from './drafting';
 import { nextLabels } from './tools';
 
 const T = '11111111-1111-4111-8111-111111111111';
@@ -41,6 +42,7 @@ function setup() {
     canDelete: (id) => model.canDelete(id),
     publishDrawing: () => undefined,
     listObjects: (type) => model.pageObjects(pageId).map((id) => model.getObject(id)).filter((o): o is BoardObject => !!o && (!type || o.type === type)),
+    guides: () => model.pageObjects(pageId).flatMap((id) => { const e = model.get(id)!; return e.module?.guides?.(e.obj, model.resolve) ?? []; }),
     hitTest: (pt, tol) => model.hitTest(pageId, pt, tol).map((id) => model.getObject(id)).filter((o): o is BoardObject => !!o),
     setSelection: (ids) => (selection = ids),
     getSelection: () => selection,
@@ -462,5 +464,90 @@ describe('6.1b: отметки и измерения', () => {
     expect(g.kind !== 'point' && measureText(g)).toBe('5');
     expect(measureText({ kind: 'poly', pts: [{ x: 0, y: 0 }, { x: 40, y: 0 }, { x: 0, y: 40 }], closed: true })).toBe('S = 2');
     expect(fmt(2.345)).toBe('2,35');
+  });
+});
+
+// =====================================================================
+//  6.1c: чертёжные инструменты
+// =====================================================================
+
+const M0 = { shift: false, alt: false, ctrl: false };
+
+describe('6.1c: линейка, транспортир, циркуль', () => {
+  it('линейка: ставится щелчком, одна на странице, поворачивается ручкой, перо идёт вдоль края', () => {
+    const { model, ctx, pageId } = setup();
+    const place = registry.getTool(`${RULER_TYPE}-tool`)!;
+    place.onPointerDown!(ev(0, 0), ctx);
+    place.onPointerDown!(ev(100, 100), ctx);
+    const rulers = ofType(model, pageId, RULER_TYPE);
+    expect(rulers).toHaveLength(1);
+    expect([rulers[0]!.x, rulers[0]!.y]).toEqual([100, 100]);
+    // Поворот на 90°: ручку тянем вниз от нуля линейки.
+    const mod = registry.getObjectModule(RULER_TYPE)!;
+    const h = mod.getHandles(model.getObject(rulers[0]!.id)!, model.resolve)[0]!;
+    const patch = mod.dragHandle!(model.getObject(rulers[0]!.id)!, h.id, { x: 100 - 28, y: 100 + 386 }, { ...M0, shift: true }, model.resolve)!;
+    expect(patch.rotation).toBeCloseTo(Math.PI / 2);
+    model.updateObjects([{ id: rulers[0]!.id, patch }]);
+    // Край линейки теперь вертикален (x = 100, от y = 100 до 500); штрих рядом с ним — ровный.
+    const pen = registry.getTool('core.pen')!;
+    pen.onPointerDown!({ ...ev(105, 150), pressure: 0.5 }, ctx);
+    for (let i = 1; i <= 10; i++) pen.onPointerMove!({ ...ev(105 + (i % 3) * 4, 150 + i * 20), pressure: 0.5 }, ctx);
+    pen.onPointerUp!({ ...ev(108, 350), pressure: 0.5 }, ctx);
+    const [stroke] = ofType(model, pageId, 'core.stroke');
+    const xs = (stroke!.props as { points: number[] }).points.filter((_, i) => i % 3 === 0).map((x) => x + stroke!.x);
+    expect(Math.max(...xs) - Math.min(...xs)).toBeLessThan(0.5);
+    expect(Math.abs(xs[0]! - 100)).toBeLessThan(0.5);
+  });
+
+  it('транспортир: луч показывает угол по шкале с учётом поворота', () => {
+    const { model, ctx, pageId } = setup();
+    registry.getTool(`${PROTRACTOR_TYPE}-tool`)!.onPointerDown!(ev(0, 0), ctx);
+    const [pr] = ofType(model, pageId, PROTRACTOR_TYPE);
+    const mod = registry.getObjectModule(PROTRACTOR_TYPE)!;
+    const ray = mod.dragHandle!(model.getObject(pr!.id)!, 'ray', { x: Math.cos(Math.PI / 6) * 100, y: -Math.sin(Math.PI / 6) * 100 }, M0, model.resolve)!;
+    expect((ray.props as { ray: number }).ray).toBe(30);
+    model.updateObjects([{ id: pr!.id, patch: { rotation: Math.PI / 2 } }]);
+    // Повёрнут на 90° по часовой: направление «вправо» на экране — 90° по шкале.
+    const ray2 = mod.dragHandle!(model.getObject(pr!.id)!, 'ray', { x: 100, y: 0 }, M0, model.resolve)!;
+    expect((ray2.props as { ray: number }).ray).toBe(90);
+  });
+
+  it('циркуль: раствор по точке, полный оборот — окружность, полуоборот — дуга', () => {
+    const { model, ctx, pageId } = setup();
+    clicks('point', ctx, [[0, 0]]);
+    const [center] = ofType(model, pageId, POINT_TYPE);
+    registry.getTool(`${COMPASS_TYPE}-tool`)!.onPointerDown!(ev(0, 0), ctx);
+    const [c] = ofType(model, pageId, COMPASS_TYPE);
+    const mod = registry.getObjectModule(COMPASS_TYPE)!;
+    const step = (handle: string, to: { x: number; y: number }) => {
+      const patch = mod.dragHandle!(model.getObject(c!.id)!, handle, to, M0, model.resolve)!;
+      model.updateObjects([{ id: c!.id, patch }], { merge: true });
+    };
+    step('pencil', { x: 60, y: 0 });
+    expect((model.getObject(c!.id)!.props as { r: number }).r).toBe(60);
+    // Полный оборот ручкой вращения (шагами по 30°).
+    const knobAt = (deg: number) => {
+      const o = model.getObject(c!.id)!;
+      const k = mod.getHandles(o, model.resolve).find((h) => h.id === 'knob')!.position;
+      const r = Math.hypot(k.x, k.y);
+      const a = Math.atan2(k.y, k.x) + (deg * Math.PI) / 180;
+      return { x: r * Math.cos(a), y: r * Math.sin(a) };
+    };
+    for (let i = 0; i < 12; i++) step('knob', knobAt(-30));
+    model.transact(() => mod.finishHandle!(model.getObject(c!.id)!, 'knob', ctx));
+    const [circle] = ofType(model, pageId, figureType('circle'));
+    expect(circle!.deps[0]).toBe(center!.id);
+    const g = geom(model, circle!.id)!;
+    expect(g.kind === 'circle' && g.r).toBeCloseTo(60);
+    expect((model.getObject(c!.id)!.props as { drawn: number }).drawn).toBe(0);
+    // Полуоборот — дуга с невидимыми концами.
+    for (let i = 0; i < 6; i++) step('knob', knobAt(30));
+    model.transact(() => mod.finishHandle!(model.getObject(c!.id)!, 'knob', ctx));
+    const [arc] = ofType(model, pageId, figureType('arc'));
+    const ag = geom(model, arc!.id)!;
+    expect(ag.kind === 'arc' && ag.g.sweep).toBeCloseTo(Math.PI, 1);
+    const ends = arc!.deps.slice(1).map((d) => model.getObject(d)!.props as PointProps);
+    expect(ends.every((p) => p.ghost)).toBe(true);
+    expect(model.hitTest(pageId, { x: model.getObject(arc!.deps[1]!)!.x, y: model.getObject(arc!.deps[1]!)!.y }, 2).some((id) => id === arc!.deps[1])).toBe(false);
   });
 });

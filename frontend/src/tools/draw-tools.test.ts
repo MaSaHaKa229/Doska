@@ -45,6 +45,7 @@ function setup(userId = T, doc = new Y.Doc(), zoom = 1) {
     canDelete: (id) => model.canDelete(id),
     publishDrawing: (d) => drawings.push(d),
     listObjects: (type) => model.pageObjects(pageId).map((id) => model.getObject(id)).filter((o): o is BoardObject => !!o && (!type || o.type === type)),
+    guides: () => [],
     hitTest: (pt, tol) => model.hitTest(pageId, pt, tol).map((id) => model.getObject(id)).filter((o): o is BoardObject => !!o),
     setSelection: () => undefined,
     getSelection: () => [],
