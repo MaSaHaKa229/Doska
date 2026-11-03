@@ -48,7 +48,7 @@
 | 6.3b. Линейная алгебра | 9e20eb7 | `frontend/src/math/linalg/{plugin.ts,rational.ts,linalg.ts,objects.tsx,editor.tsx,tools.tsx}`; `e2e/linalg.cjs` |
 | 6.4a. Стереометрия: сцена и тела | c8fb81b | `frontend/src/math/stereo/{plugin.ts,solids.ts,objects.tsx,editor.tsx,three-view.tsx,tools.tsx}`; `BoardPlugin.viewers`, `PluginEditorProps.readOnly/subscribeObject` (`packages/shared/src/plugins/types.ts`, `pages/board/PluginEditors.tsx`); `three@0.184.0`; `e2e/stereo.cjs` |
 
-Тесты: 76 в `packages/shared`, 115 в `backend`, 203 в `frontend`, 4 в `services/formula-ocr` (`npm run test:ocr`). Все проходят. Сквозные сценарии `e2e/lesson.cjs`, `e2e/assignments.cjs`, `e2e/drawing.cjs`, `e2e/media.cjs`, `e2e/text.cjs`, `e2e/formula.cjs`, `e2e/calc.cjs`, `e2e/planimetry.cjs`, `e2e/constructions.cjs`, `e2e/drafting.cjs`, `e2e/graphs.cjs`, `e2e/calculus.cjs`, `e2e/analytic.cjs`, `e2e/linalg.cjs` и `e2e/stereo.cjs` прошли в браузере (см. `e2e/README.md`; подряд все упираются в ограничение частоты входов — см. там же). После изменений ядра в 6.4a (`PluginEditors`, типы плагинов) старые сценарии прогоняются повторно — результат см. в «Где остановились».
+Тесты: 76 в `packages/shared`, 115 в `backend`, 203 в `frontend`, 4 в `services/formula-ocr` (`npm run test:ocr`). Все проходят. Сквозные сценарии `e2e/lesson.cjs`, `e2e/assignments.cjs`, `e2e/drawing.cjs`, `e2e/media.cjs`, `e2e/text.cjs`, `e2e/formula.cjs`, `e2e/calc.cjs`, `e2e/planimetry.cjs`, `e2e/constructions.cjs`, `e2e/drafting.cjs`, `e2e/graphs.cjs`, `e2e/calculus.cjs`, `e2e/analytic.cjs`, `e2e/linalg.cjs` и `e2e/stereo.cjs` прошли в браузере (см. `e2e/README.md`; подряд все упираются в ограничение частоты входов — см. там же). После изменений ядра в 6.4a (`PluginEditors`, типы плагинов) старые сценарии прогоняются повторно — все прошли.
 
 **Что вошло в 6.4a (6.4 разделён: 6.4a — сцена и тела, 6.4b — построения в пространстве):**
 - **Плагин `math.stereo`**, объект `math.stereo.scene`: рамка `w × h`, вид (`yaw`, `pitch`, `scale`), режим невидимых линий (пунктир / скрыть / сплошные), рамка, размер подписей, до 12 тел в `props` (схема `bodySchema`, сцена из 12 тел — меньше 40 КБ).
@@ -172,7 +172,7 @@
 
 ## 3. Текущее состояние
 
-- **Где остановились.** Подэтап 6.4a закрыт и запушен. Регрессия старых сценариев после изменения ядра: идёт (lesson, assignments — прошли). Следующий — 6.4b (план в разделе 5); пользователь его ещё не подтверждал. Рабочая копия чистая, всё запушено в `origin/stage-1-architecture`.
+- **Где остановились.** Подэтап 6.4a закрыт и запушен. Регрессия после изменения ядра: все 13 прежних сценариев (кроме `calc`, ему нужен подставной сервис распознавания; редакторы формул не менялись) прошли заново. Следующий — 6.4b (план в разделе 5); пользователь его ещё не подтверждал. Рабочая копия чистая, всё запушено в `origin/stage-1-architecture`.
 - **Не проверено здесь:** образ `services/formula-ocr` не собирался — в этом окружении нет запущенного Docker-демона, а индекс PyTorch закрыт прокси. Обёртка проверена тестами с подставной моделью, бэкенд — с подставным сервисом, браузерный сценарий — с подставным сервисом. Первую настоящую сборку сделать на сервере (этап 9) и проверить распознавание на живой рукописи.
 - **Сломанного не известно.** Плавающий сбой тестов бэкенда найден и исправлен в 5.1 (см. выше).
 - **Точки расширения, которые заполнят следующие этапы (не заглушки):**
