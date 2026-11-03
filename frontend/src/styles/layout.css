@@ -1221,3 +1221,61 @@ kbd {
 .input--error {
   border-color: var(--danger);
 }
+
+/* 3D-редактор стереометрии (этап 6.4a) */
+.stereo-editor {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+  flex-wrap: wrap;
+}
+.stereo-view {
+  position: relative;
+  max-width: 100%;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  overflow: hidden;
+  touch-action: none;
+  cursor: grab;
+  user-select: none;
+}
+.stereo-view:active {
+  cursor: grabbing;
+}
+.stereo-view__gl,
+.stereo-view__svg,
+.stereo-view__frame {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.stereo-view__frame {
+  inset: auto;
+  border: 1px dashed var(--border-strong, var(--border));
+}
+.stereo-panel {
+  flex: 1;
+  min-width: 260px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.stereo-fields {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: flex-end;
+}
+.stereo-sep {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: 4px 0;
+  width: 100%;
+}
+fieldset.stereo-panel {
+  border: none;
+  margin: 0;
+  padding: 0;
+  min-width: 260px;
+}

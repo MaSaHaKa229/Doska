@@ -15,12 +15,15 @@ function pluginEditor(name: string): ComponentType<PluginEditorProps> | null {
   return null;
 }
 
+/** Редактор открывается и без права изменения — для просмотра (BoardPlugin.viewers). */
+const isViewer = (name: string) => registry.listPlugins().some((p) => p.viewers?.includes(name));
+
 /**
  * Открывает редакторы объектов плагинов (двойной щелчок по объекту или
  * запрос инструмента) и даёт им API записи на текущей странице.
  */
 export function PluginEditorsHost({ model }: { model: BoardModel }) {
-  const [req, setReq] = useState<EditObjectDetail | null>(null);
+  const [req, setReq] = useState<(EditObjectDetail & { readOnly: boolean }) | null>(null);
   const pageId = useBoard((s) => s.pageId);
   const caps = useBoard((s) => s.caps);
 
@@ -28,11 +31,12 @@ export function PluginEditorsHost({ model }: { model: BoardModel }) {
     const onEdit = (e: Event) => {
       const d = (e as CustomEvent<EditObjectDetail>).detail;
       if (!pluginEditor(d.editor)) return;
-      if (d.id && !model.canModify(d.id, 'props')) {
+      const readOnly = !!d.id && !model.canModify(d.id, 'props');
+      if (readOnly && !isViewer(d.editor)) {
         toast.info('Этот объект нельзя изменить');
         return;
       }
-      setReq(d);
+      setReq({ ...d, readOnly });
     };
     window.addEventListener(EDIT_OBJECT_EVENT, onEdit);
     return () => window.removeEventListener(EDIT_OBJECT_EVENT, onEdit);
@@ -68,5 +72,13 @@ export function PluginEditorsHost({ model }: { model: BoardModel }) {
 
   const Editor = req ? pluginEditor(req.editor) : null;
   if (!req || !Editor || !ctx) return null;
-  return createElement(Editor, { key: `${req.editor}:${req.id ?? 'new'}`, objectId: req.id, at: req.at, ctx, close: () => setReq(null) }) as ReactNode;
+  return createElement(Editor, {
+    key: `${req.editor}:${req.id ?? 'new'}`,
+    objectId: req.id,
+    at: req.at,
+    ctx,
+    close: () => setReq(null),
+    readOnly: req.readOnly,
+    subscribeObject: (id: string, l: () => void) => model.subscribeObject(id, l),
+  }) as ReactNode;
 }

@@ -430,6 +430,14 @@ export interface PluginEditorProps {
   at: Point | null;
   ctx: EditorContext;
   close(): void;
+  /**
+   * Нет права изменить объект: редактор открыт только для просмотра
+   * (имя редактора есть в BoardPlugin.viewers) — например, ученик вращает
+   * 3D-сцену учителя у себя, ничего не записывая.
+   */
+  readOnly: boolean;
+  /** Подписка на изменения объекта в документе (правки других участников). */
+  subscribeObject(id: string, listener: () => void): () => void;
 }
 
 export type WorkerFactory = () => { postMessage(data: unknown): void; terminate(): void };
@@ -456,6 +464,11 @@ export interface BoardPlugin<R = unknown> {
    * открывает его двойным щелчком по объекту или по запросу инструмента.
    */
   editors?: Record<string, (props: PluginEditorProps) => R>;
+  /**
+   * Редакторы, которые открываются и без права изменения объекта — только
+   * для просмотра (PluginEditorProps.readOnly): вращение 3D-сцены.
+   */
+  viewers?: string[];
   /** Обработчики заданий Web Worker: имя задания → фабрика воркера. */
   workers?: Record<string, WorkerFactory>;
 }
