@@ -1202,3 +1202,22 @@ kbd {
   padding: 0 10px;
   color: var(--text);
 }
+
+/* ----- Матрица (6.3b) ----- */
+.matrix-grid {
+  display: grid;
+  gap: 6px;
+  margin: 12px 0 4px;
+  overflow-x: auto;
+}
+.matrix-grid .input {
+  text-align: center;
+  padding-left: 4px;
+  padding-right: 4px;
+}
+.matrix-grid__aug {
+  border-left: 2px dashed var(--border-strong);
+}
+.input--error {
+  border-color: var(--danger);
+}
