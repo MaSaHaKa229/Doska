@@ -15,7 +15,7 @@
 
 ## 2. Что сделано
 
-Ветка `stage-1-architecture`; последний коммит кода — `XXXXXXX` (этап 6.3b), затем коммит с `HANDOFF.md`. Ветка `main` указывает на коммит этапа 1 (`21e5b4a`). Открыт пулл-реквест #1 `stage-1-architecture` → `main`.
+Ветка `stage-1-architecture`; последний коммит кода — `9e20eb7` (этап 6.3b), затем коммит с `HANDOFF.md`. Ветка `main` указывает на коммит этапа 1 (`21e5b4a`). Открыт пулл-реквест #1 `stage-1-architecture` → `main`.
 
 | Этап | Коммит | Основные файлы |
 |---|---|---|
@@ -26,7 +26,7 @@
 | 3.1. Доски, папки, сервер реального времени | 01efee1 | `backend/src/boards/`, `backend/src/realtime/{guard,room,server,persistence,connection,doc,rate-limit}.ts`, `frontend/src/pages/boards/` |
 | 3.2. Ядро холста | f268dd7 | `frontend/src/{collab,canvas,objects,tools,plugins}/`, `frontend/src/pages/board/` |
 | 3.3. Присутствие, офлайн, привязки, Ctrl+K, справка | 505e9f3 | `frontend/src/collab/{presence,people}.ts`, `frontend/src/canvas/snapping.ts`, `frontend/src/pages/board/{PresenceUi,ViewMenu,Palette,boardCommands}.tsx`, эндпоинт `GET /api/boards/:id/people` |
-| 6.3b. Линейная алгебра | XXXXXXX | `frontend/src/math/linalg/{plugin.ts,rational.ts,linalg.ts,objects.tsx,editor.tsx,tools.tsx}`; `e2e/linalg.cjs` |
+| 6.3b. Линейная алгебра | 9e20eb7 | `frontend/src/math/linalg/{plugin.ts,rational.ts,linalg.ts,objects.tsx,editor.tsx,tools.tsx}`; `e2e/linalg.cjs` |
 | 6.3a. Аналитическая геометрия | 184383e | `frontend/src/math/analytic/{plugin.ts,eqs.ts,objects.tsx,editor.tsx,tools.tsx}`; `e2e/analytic.cjs` |
 | 6.2b. Анализ на графике | d607676 | `frontend/src/math/analysis/{calculus.ts,features.tsx,calculus-tools.tsx}`, `derivatives` в `expr.ts`; `e2e/calculus.cjs` |
 | 6.2a. Графики: оси, кривые, слайдеры, таблица, числовая прямая, тригокружность | e011d8f | `frontend/src/math/analysis/{plugin.ts,expr.ts,plot.ts,objects.tsx,editor.tsx,tools.tsx}`; `BoardPlugin.editors`, `EditorContext`, `ObjectModule.moveDeps`; `pages/board/PluginEditors.tsx`; `e2e/graphs.cjs` |
