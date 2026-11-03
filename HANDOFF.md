@@ -13,9 +13,15 @@
 - затем ждать «Продолжай».
 - Весь текст — на русском: интерфейс, комментарии в коде, коммиты.
 
+**Как начать новую сессию (по порядку):**
+1. Прочитать этот файл целиком, затем `docs/ROADMAP.md` (что сделано и что дальше) и `docs/PLUGINS.md` (как устроены разделы-плагины).
+2. Поднять окружение и убедиться, что всё зелёное (раздел 6): `service postgresql start`, `npm install && npm run build:shared`, `npm run check`.
+3. Следующий шаг — этап **6.4** (раздел 5). Пользователю уже отправлен план 6.4 с предложением разбить его на 6.4a и 6.4b; ответа ещё не было. Если пользователь пишет «Продолжай» — разбиение принято, начинать с 6.4a.
+4. Работать по правилам выше; в конце каждого подэтапа обновлять этот файл (таблица коммитов, «Что вошло», «Где остановились», «Что осталось»), коммит кода, затем коммит `HANDOFF.md` с хешем.
+
 ## 2. Что сделано
 
-Ветка `stage-1-architecture`; последний коммит кода — `9e20eb7` (этап 6.3b), затем коммит с `HANDOFF.md`. Ветка `main` указывает на коммит этапа 1 (`21e5b4a`). Открыт пулл-реквест #1 `stage-1-architecture` → `main`.
+Ветка `stage-1-architecture`; последний коммит кода — `9e20eb7` (этап 6.3b), затем коммит с `HANDOFF.md`. Ветка `main` указывает на коммит этапа 1 (`21e5b4a`). Открыт пулл-реквест #1 `stage-1-architecture` → `main` — в нём все этапы со 2.1 по 6.3b (описание PR на GitHub не обновлялось с этапа 3.3; обновлять — только по просьбе пользователя).
 
 | Этап | Коммит | Основные файлы |
 |---|---|---|
@@ -26,20 +32,20 @@
 | 3.1. Доски, папки, сервер реального времени | 01efee1 | `backend/src/boards/`, `backend/src/realtime/{guard,room,server,persistence,connection,doc,rate-limit}.ts`, `frontend/src/pages/boards/` |
 | 3.2. Ядро холста | f268dd7 | `frontend/src/{collab,canvas,objects,tools,plugins}/`, `frontend/src/pages/board/` |
 | 3.3. Присутствие, офлайн, привязки, Ctrl+K, справка | 505e9f3 | `frontend/src/collab/{presence,people}.ts`, `frontend/src/canvas/snapping.ts`, `frontend/src/pages/board/{PresenceUi,ViewMenu,Palette,boardCommands}.tsx`, эндпоинт `GET /api/boards/:id/people` |
-| 6.3b. Линейная алгебра | 9e20eb7 | `frontend/src/math/linalg/{plugin.ts,rational.ts,linalg.ts,objects.tsx,editor.tsx,tools.tsx}`; `e2e/linalg.cjs` |
-| 6.3a. Аналитическая геометрия | 184383e | `frontend/src/math/analytic/{plugin.ts,eqs.ts,objects.tsx,editor.tsx,tools.tsx}`; `e2e/analytic.cjs` |
-| 6.2b. Анализ на графике | d607676 | `frontend/src/math/analysis/{calculus.ts,features.tsx,calculus-tools.tsx}`, `derivatives` в `expr.ts`; `e2e/calculus.cjs` |
-| 6.2a. Графики: оси, кривые, слайдеры, таблица, числовая прямая, тригокружность | e011d8f | `frontend/src/math/analysis/{plugin.ts,expr.ts,plot.ts,objects.tsx,editor.tsx,tools.tsx}`; `BoardPlugin.editors`, `EditorContext`, `ObjectModule.moveDeps`; `pages/board/PluginEditors.tsx`; `e2e/graphs.cjs` |
-| 6.1c. Линейка, транспортир, циркуль | cc9abef | `frontend/src/math/planimetry/drafting.tsx`; `ObjectModule.guides`/`finishHandle`, `ToolContext.guides` (`packages/shared/src/plugins/types.ts`); перо вдоль края (`tools/draw-tools.tsx`); `e2e/drafting.cjs` |
-| 6.1b. Построения, преобразования, отметки | 1371cc6 | `frontend/src/math/planimetry/{eval.ts,constructions.tsx}`, расширены `objects.tsx`, `geometry.ts`; `BoardPlugin.sections`, `ToolContext.getSelection`; ручки объектов с приоритетом без выделения (`BoardStage.handleAt`); `e2e/constructions.cjs` |
-| 6.1a. Планиметрия: точки, фигуры, динамическая геометрия | 6b27afd | `frontend/src/math/planimetry/{plugin.ts,objects.tsx,tools.tsx,geometry.ts}`; граф зависимостей в `frontend/src/collab/model.ts`; `derived`/`hitPriority`/`unbounded`, `ToolContext.listObjects` в `packages/shared/src/plugins/types.ts`; раздел-кнопка в `pages/board/Panels.tsx`; `e2e/planimetry.cjs` |
-| 5.3b. Калькулятор, распознавание рукописных формул | ac1476a | `frontend/src/formula/{calc,handwriting}.ts`, `frontend/src/objects/calc.tsx`, `frontend/src/pages/board/{CalcPanel,recognize,useOcrEnabled}.ts(x)`, `frontend/src/api/formula.ts`; `backend/src/formula/ocr.{service,routes}.ts`; `services/formula-ocr/`, `docker-compose.yml` (профиль `ocr`); `e2e/calc.cjs` |
-| 5.3a. Формулы: MathLive, палитра, «Решение» | 88f4e93 | `frontend/src/formula/{palette,mathlive,FormulaDialog,latex-to-mathjs,check}.ts(x)`, `frontend/src/objects/{formula,solution}.tsx`, `frontend/src/tools/formula-tools.tsx`, `frontend/src/pages/board/FormulaEditors.tsx`; плагин шрифтов MathLive в `frontend/vite.config.ts`; `e2e/formula.cjs` |
-| 5.2b. Текст: форматирование, формулы, таблицы | c8961a3 | `frontend/src/text/{schema,render}.ts`, `frontend/src/objects/text.tsx`, `frontend/src/pages/board/TextEditor.tsx`, `frontend/src/tools/text-tool.tsx`; `ObjectModule.applyResize`; `e2e/text.cjs` |
-| 5.2a. Файлы: хранилище, картинки, PDF как фон | 0748405 | `backend/src/assets/{storage,sniff,assets.service,assets.routes}.ts`; `frontend/src/media/{prepareImage,imageCache,insert,pdf}.ts`, `frontend/src/objects/image.tsx`, `frontend/src/canvas/PdfBackground.tsx`, `frontend/src/pages/board/MediaUi.tsx`, `frontend/src/tools/media-tool.tsx`; `e2e/media.cjs` |
-| 5.1. Рисование: перо, маркер, ластик, распознавание фигур | a8b7309 | `frontend/src/objects/stroke/{geometry,stroke}.ts(x)`, `frontend/src/tools/draw-tools.tsx`; расширен `ToolContext` (`packages/shared/src/plugins/types.ts`); `e2e/drawing.cjs` |
-| 4.2. Задания, главная ученика, миниатюры | 1079aab | `backend/src/assignments/`, `backend/src/boards/work-info.ts`, `backend/src/realtime/state.ts`, `?lite=1` в `realtime/{server,room}.ts`; `frontend/src/pages/assignments/`, `frontend/src/pages/board/WorkBar.tsx`, `frontend/src/canvas/BoardThumbnail.tsx`, `frontend/src/ui/Thumbs.tsx`, `e2e/assignments.cjs` |
 | 4.1. Уроки и права учителя | 5c1abc8 | `backend/src/realtime/lesson.ts`, `room.ts`; `GET /api/directory/users`, `mode` в `PATCH /api/boards/:id`; `frontend/src/pages/board/{LessonUi,LaserLayer,useFollow}.tsx`, `frontend/src/pages/boards/AccessDialog.tsx`, `frontend/src/collab/{laser,follow}.ts`, `frontend/src/tools/availability.ts`, `e2e/` |
+| 4.2. Задания, главная ученика, миниатюры | 1079aab | `backend/src/assignments/`, `backend/src/boards/work-info.ts`, `backend/src/realtime/state.ts`, `?lite=1` в `realtime/{server,room}.ts`; `frontend/src/pages/assignments/`, `frontend/src/pages/board/WorkBar.tsx`, `frontend/src/canvas/BoardThumbnail.tsx`, `frontend/src/ui/Thumbs.tsx`, `e2e/assignments.cjs` |
+| 5.1. Рисование: перо, маркер, ластик, распознавание фигур | a8b7309 | `frontend/src/objects/stroke/{geometry,stroke}.ts(x)`, `frontend/src/tools/draw-tools.tsx`; расширен `ToolContext` (`packages/shared/src/plugins/types.ts`); `e2e/drawing.cjs` |
+| 5.2a. Файлы: хранилище, картинки, PDF как фон | 0748405 | `backend/src/assets/{storage,sniff,assets.service,assets.routes}.ts`; `frontend/src/media/{prepareImage,imageCache,insert,pdf}.ts`, `frontend/src/objects/image.tsx`, `frontend/src/canvas/PdfBackground.tsx`, `frontend/src/pages/board/MediaUi.tsx`, `frontend/src/tools/media-tool.tsx`; `e2e/media.cjs` |
+| 5.2b. Текст: форматирование, формулы, таблицы | c8961a3 | `frontend/src/text/{schema,render}.ts`, `frontend/src/objects/text.tsx`, `frontend/src/pages/board/TextEditor.tsx`, `frontend/src/tools/text-tool.tsx`; `ObjectModule.applyResize`; `e2e/text.cjs` |
+| 5.3a. Формулы: MathLive, палитра, «Решение» | 88f4e93 | `frontend/src/formula/{palette,mathlive,FormulaDialog,latex-to-mathjs,check}.ts(x)`, `frontend/src/objects/{formula,solution}.tsx`, `frontend/src/tools/formula-tools.tsx`, `frontend/src/pages/board/FormulaEditors.tsx`; плагин шрифтов MathLive в `frontend/vite.config.ts`; `e2e/formula.cjs` |
+| 5.3b. Калькулятор, распознавание рукописных формул | ac1476a | `frontend/src/formula/{calc,handwriting}.ts`, `frontend/src/objects/calc.tsx`, `frontend/src/pages/board/{CalcPanel,recognize,useOcrEnabled}.ts(x)`, `frontend/src/api/formula.ts`; `backend/src/formula/ocr.{service,routes}.ts`; `services/formula-ocr/`, `docker-compose.yml` (профиль `ocr`); `e2e/calc.cjs` |
+| 6.1a. Планиметрия: точки, фигуры, динамическая геометрия | 6b27afd | `frontend/src/math/planimetry/{plugin.ts,objects.tsx,tools.tsx,geometry.ts}`; граф зависимостей в `frontend/src/collab/model.ts`; `derived`/`hitPriority`/`unbounded`, `ToolContext.listObjects` в `packages/shared/src/plugins/types.ts`; раздел-кнопка в `pages/board/Panels.tsx`; `e2e/planimetry.cjs` |
+| 6.1b. Построения, преобразования, отметки | 1371cc6 | `frontend/src/math/planimetry/{eval.ts,constructions.tsx}`, расширены `objects.tsx`, `geometry.ts`; `BoardPlugin.sections`, `ToolContext.getSelection`; ручки объектов с приоритетом без выделения (`BoardStage.handleAt`); `e2e/constructions.cjs` |
+| 6.1c. Линейка, транспортир, циркуль | cc9abef | `frontend/src/math/planimetry/drafting.tsx`; `ObjectModule.guides`/`finishHandle`, `ToolContext.guides` (`packages/shared/src/plugins/types.ts`); перо вдоль края (`tools/draw-tools.tsx`); `e2e/drafting.cjs` |
+| 6.2a. Графики: оси, кривые, слайдеры, таблица, числовая прямая, тригокружность | e011d8f | `frontend/src/math/analysis/{plugin.ts,expr.ts,plot.ts,objects.tsx,editor.tsx,tools.tsx}`; `BoardPlugin.editors`, `EditorContext`, `ObjectModule.moveDeps`; `pages/board/PluginEditors.tsx`; `e2e/graphs.cjs` |
+| 6.2b. Анализ на графике | d607676 | `frontend/src/math/analysis/{calculus.ts,features.tsx,calculus-tools.tsx}`, `derivatives` в `expr.ts`; `e2e/calculus.cjs` |
+| 6.3a. Аналитическая геометрия | 184383e | `frontend/src/math/analytic/{plugin.ts,eqs.ts,objects.tsx,editor.tsx,tools.tsx}`; `e2e/analytic.cjs` |
+| 6.3b. Линейная алгебра | 9e20eb7 | `frontend/src/math/linalg/{plugin.ts,rational.ts,linalg.ts,objects.tsx,editor.tsx,tools.tsx}`; `e2e/linalg.cjs` |
 
 Тесты: 76 в `packages/shared`, 115 в `backend`, 177 в `frontend`, 4 в `services/formula-ocr` (`npm run test:ocr`). Все проходят. Сквозные сценарии `e2e/lesson.cjs`, `e2e/assignments.cjs`, `e2e/drawing.cjs`, `e2e/media.cjs`, `e2e/text.cjs`, `e2e/formula.cjs`, `e2e/calc.cjs`, `e2e/planimetry.cjs`, `e2e/constructions.cjs`, `e2e/drafting.cjs`, `e2e/graphs.cjs`, `e2e/calculus.cjs`, `e2e/analytic.cjs` и `e2e/linalg.cjs` прошли в браузере (см. `e2e/README.md`; подряд все четырнадцать упираются в ограничение частоты входов — см. там же).
 
@@ -155,7 +161,7 @@
 
 ## 3. Текущее состояние
 
-- **Где остановились.** Подэтап 6.3b закрыт и запушен — этап 6.3 завершён. Пользователю отправлен план 6.4. Ждём «Продолжай» на 6.4. Незавершённых правок нет.
+- **Где остановились.** Подэтап 6.3b закрыт и запушен — этап 6.3 завершён. Пользователю отправлен план 6.4 (разбиение на 6.4a и 6.4b, см. раздел 5); подтверждения ещё нет. Затем пользователь попросил подготовить репозиторий к передаче новой сессии — этот файл обновлён для неё. Рабочая копия чистая, всё запушено в `origin/stage-1-architecture`.
 - **Не проверено здесь:** образ `services/formula-ocr` не собирался — в этом окружении нет запущенного Docker-демона, а индекс PyTorch закрыт прокси. Обёртка проверена тестами с подставной моделью, бэкенд — с подставным сервисом, браузерный сценарий — с подставным сервисом. Первую настоящую сборку сделать на сервере (этап 9) и проверить распознавание на живой рукописи.
 - **Сломанного не известно.** Плавающий сбой тестов бэкенда найден и исправлен в 5.1 (см. выше).
 - **Точки расширения, которые заполнят следующие этапы (не заглушки):**
@@ -262,8 +268,10 @@
 
 ## 5. Что осталось
 
-1. **6.4.** Стереометрия и 3D (вероятно, 6.4a — сцена и тела, 6.4b — сечения, развёртки, прямые и плоскости в пространстве, «Следуйте за мной» для камеры сцены).
-2. **6.5.** Остальные разделы математики (6.5a–6.5e).
+1. **6.4. Стереометрия и 3D** — предложено пользователю двумя частями (подтверждения ещё нет):
+   - **6.4a — сцена и тела.** Объект `math.stereo.scene` (по `docs/BOARD_MODEL.md`: вся модель сцены — тела, точки, сечения — внутри `props` одного объекта, не больше 512 КБ). Three.js — отдельным ленивым чанком, как math.js и MathLive. На доске сцена — чертёж «как в учебнике»: видимые рёбра сплошные, невидимые — пунктиром, подписи вершин A, B, C, A₁…; двойной щелчок — вращение мышью/пальцами и правка. Тела: куб, прямоугольный параллелепипед, правильные и произвольные призмы и пирамиды, усечённая пирамида, цилиндр, конус, усечённый конус, шар; размеры, прозрачность, цвет граней. «Следуйте за мной» передаёт ученикам поворот сцены через `registerSceneCamera`/`notifySceneCamera` (`frontend/src/collab/follow.ts`, заготовлено в 4.1).
+   - **6.4b — построения в пространстве.** Точки на рёбрах и гранях, отрезки, прямые и плоскости через точки; сечение многогранника плоскостью через три точки (многоугольник сечения закрашен); расстояния и углы между прямыми и плоскостями; развёртки куба, призмы, пирамиды; «Плоский чертёж» — снимок сцены обычными отрезками и точками доски.
+2. **6.5.** Многие переменные и векторный анализ, ДУ, комплексные числа, вероятность и статистика, дискретная математика (6.5a–6.5e; каталог объектов — `docs/BOARD_MODEL.md`, раздел 4).
 3. **7.1–7.8.** Физика — по одному подразделу за ответ.
 4. **8.1.** Библиотека шаблонов, справочник формул. **8.2.** Экспорт PNG/SVG/PDF, интерфейс истории версий и восстановление (семантическое, по `docs/SYNC_PROTOCOL.md`, раздел 12).
 5. **9.** Docker Compose (дополнить `docker-compose.yml`, где пока только `formula-ocr`; собрать и проверить образ распознавания), Nginx, certbot, `install.sh` / `update.sh` / `backup.sh` / `restore.sh`, systemd, ротация логов, полный README.
@@ -312,7 +320,9 @@ node /home/user/Doska/node_modules/vite/bin/vite.js /home/user/Doska/frontend --
 **Сквозные проверки:**
 - Playwright предустановлен: `require('playwright')`, `chromium.launch()`.
 - В режиме разработки страница доски выставляет `window.__doska = { model, store, commands }`.
-- Сценарии сквозных проверок лежат в `e2e/` (`lesson.cjs`, `assignments.cjs`, `drawing.cjs`, `media.cjs`, `text.cjs`; запуск — `e2e/README.md`). Пользователей для них создаёт `e2e/setup.mts` (пароль `Kot12345e2e`).
+- Сценарии сквозных проверок лежат в `e2e/` — 14 штук: `lesson`, `assignments`, `drawing`, `media`, `text`, `formula`, `calc`, `planimetry`, `constructions`, `drafting`, `graphs`, `calculus`, `analytic`, `linalg` (`.cjs`; что проверяет каждый — `e2e/README.md`). Пользователей и класс для них создаёт `e2e/setup.mts` (`cd backend && sh scripts/with-env.sh npx tsx ../e2e/setup.mts`, пароль `Kot12345e2e`); он печатает `classId` — его передают сценарию: `node e2e/<имя>.cjs <classId>`. В dev-базе этой сессии `classId` = `3ee75c0e-3eac-4e42-b6c1-a97ca4178a72`; в новом контейнере база новая — запустить `setup.mts` заново.
+- Подряд сценарии упираются в ограничение входов (10 в минуту с IP): между ними пауза ~60 с, например `for s in drawing text; do sleep 62; node e2e/$s.cjs <classId>; done`. Снимки экрана — в `$E2E_OUT`.
+- Регрессия после изменений ядра (`collab/model.ts`, `canvas/BoardStage.tsx`, `packages/shared/src/plugins/types.ts`) — прогонять все сценарии, а не только новый: так ловились ошибки в предыдущих этапах.
 - Кнопка участников находится по `locator('button.participants')`: её доступное имя складывается из аватаров.
 - **Выбор файла в Playwright:** путь с кириллицей Chromium не принимает (поле получает `cancel`) — передавайте файл содержимым `{ name, mimeType, buffer }`. Держите постоянный обработчик `page.on('filechooser', …)`: иначе между выборами перехват окна выключается асинхронно, и следующий выбор может не перехватиться.
 - **Не правьте файлы фронтенда во время сценария:** Vite перезагрузит страницу, и сценарий упадёт.
@@ -344,7 +354,7 @@ node /home/user/Doska/node_modules/vite/bin/vite.js /home/user/Doska/frontend --
 
 ### Решено пользователем (не переспрашивать)
 
-1. **Ветка и PR.** Ветка `main` нужна, работа идёт через пулл-реквесты. `main` создана на коммите этапа 1 (`21e5b4a`); PR из `stage-1-architecture` в `main` содержит этапы 2.1–3.3. Новые этапы коммитить в `stage-1-architecture` (этот PR) или по договорённости в отдельные ветки от `main`.
+1. **Ветка и PR.** Ветка `main` нужна, работа идёт через пулл-реквесты. `main` создана на коммите этапа 1 (`21e5b4a`); PR #1 из `stage-1-architecture` в `main` содержит этапы 2.1–6.3b (описание на GitHub устарело — оно про 2.1–3.3). Новые этапы коммитить в `stage-1-architecture` (этот PR) или по договорённости в отдельные ветки от `main`.
 2. **Распознавание рукописных формул (этап 5.3)** — выбор оставлен за нами, выбрана своя установка pix2tex (LaTeX-OCR): отдельный необязательный контейнер с HTTP-обёрткой в Docker Compose (профиль `ocr`). Причины: рукописи школьников не уходят во внешний сервис, нет ключа API и оплаты. Интерфейс через `FORMULA_OCR_URL` оставить совместимым и с внешними сервисами; пустая переменная выключает функцию.
 3. **Выдача досок отдельным ученикам — без ограничений:** учитель может выдать доску любому ученику, не только из своих классов. Классы — по-прежнему только свои. Текущее поведение верное, менять не нужно.
 4. **Ученик в режиме «Совместная работа» по умолчанию не меняет чужие ученические объекты;** разрешает это настройка доски `allowStudentsEditOthers`. Подтверждено.
