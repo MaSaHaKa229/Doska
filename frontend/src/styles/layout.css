@@ -1279,3 +1279,37 @@ fieldset.stereo-panel {
   padding: 0;
   min-width: 260px;
 }
+/* Построения в 3D-редакторе (этап 6.4b) */
+.stereo-tabs,
+.stereo-modes {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.stereo-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 220px;
+  overflow-y: auto;
+}
+.stereo-list__row {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+.stereo-list__name {
+  width: 52px;
+  padding-left: 6px;
+  padding-right: 6px;
+}
+.stereo-list__t {
+  width: 64px;
+}
+.stereo-hint {
+  max-width: 440px;
+  color: var(--accent, inherit);
+}
+.stereo-view[data-mode]:not([data-mode='rotate']) {
+  cursor: crosshair;
+}

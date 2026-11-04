@@ -724,6 +724,8 @@ export class BoardModel {
           }
           if (JSON.stringify(ymap.get(field)) === JSON.stringify(next)) continue;
           ymap.set(field, next as JsonValue);
+          // props записаны уже по схеме текущей версии (после migrate): версия объекта — тоже.
+          if (field === 'props' && entry.module && entry.obj.v < entry.module.version) ymap.set('v', entry.module.version);
           changed = true;
         }
         if (changed) {

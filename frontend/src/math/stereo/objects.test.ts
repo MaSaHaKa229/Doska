@@ -3,16 +3,39 @@ import type { BoardObject, ResolveContext } from '@doska/shared';
 import { registry } from '../../plugins/registry';
 import { drawingOf, sceneModule, sceneSvg, sceneWith, scenePropsSchema, SCENE_TYPE, type SceneProps } from './objects';
 import { newBody } from './solids';
+import { flatDrawing } from './flat';
+import { NET_TYPE, netModule, type NetProps } from './nets';
 
 const obj = (props: SceneProps): BoardObject<SceneProps> =>
-  ({ id: 's1', type: SCENE_TYPE, v: 1, pageId: 'p', x: 100, y: 50, rotation: 0, scaleX: 1, scaleY: 1, z: 'a', layer: 'main', locked: false, groupId: null, deps: [], props, createdBy: 'u', createdAt: 0, updatedBy: 'u', updatedAt: 0 }) as unknown as BoardObject<SceneProps>;
+  ({
+    id: 's1',
+    type: SCENE_TYPE,
+    v: 1,
+    pageId: 'p',
+    x: 100,
+    y: 50,
+    rotation: 0,
+    scaleX: 1,
+    scaleY: 1,
+    z: 'a',
+    layer: 'main',
+    locked: false,
+    groupId: null,
+    deps: [],
+    props,
+    createdBy: 'u',
+    createdAt: 0,
+    updatedBy: 'u',
+    updatedAt: 0,
+  }) as unknown as BoardObject<SceneProps>;
 const rctx = { getObject: () => undefined, getComputed: () => undefined, zoom: 1, theme: 'light' } as ResolveContext;
 
 describe('объект «3D-сцена»', () => {
-  it('плагин зарегистрирован: тип, 10 инструментов, редактор', () => {
+  it('плагин зарегистрирован: сцена и развёртка, 12 инструментов, редактор', () => {
     expect(registry.getObjectModule(SCENE_TYPE)).toBeTruthy();
+    expect(registry.getObjectModule(NET_TYPE)).toBeTruthy();
     const tools = registry.listTools().filter((t) => t.id.startsWith('math.stereo.'));
-    expect(tools).toHaveLength(10);
+    expect(tools).toHaveLength(12);
     expect(registry.listPlugins().find((p) => p.id === 'math.stereo')?.editors?.['stereo.scene']).toBeTruthy();
   });
 
@@ -35,7 +58,14 @@ describe('объект «3D-сцена»', () => {
   });
 
   it('размер сцены с 12 телами — далеко от предела 512 КБ', () => {
-    const p = { ...sceneWith('cube'), bodies: Array.from({ length: 12 }, (_, i) => ({ ...newBody('prism', `b${i}`), base: Array.from({ length: 12 }, (_, k) => [Math.cos(k / 2), Math.sin(k / 2)] as [number, number]), labels: 'A'.repeat(200) })) };
+    const p = {
+      ...sceneWith('cube'),
+      bodies: Array.from({ length: 12 }, (_, i) => ({
+        ...newBody('prism', `b${i}`),
+        base: Array.from({ length: 12 }, (_, k) => [Math.cos(k / 2), Math.sin(k / 2)] as [number, number]),
+        labels: 'A'.repeat(200),
+      })),
+    };
     expect(JSON.stringify(p).length).toBeLessThan(40_000);
   });
 
@@ -63,5 +93,34 @@ describe('объект «3D-сцена»', () => {
     const p = sceneWith('cone');
     expect(drawingOf(p)).toBe(drawingOf(p));
     expect(drawingOf({ ...p })).not.toBe(drawingOf(p));
+  });
+
+  it('плоский чертёж куба: 8 подписанных вершин, 12 рёбер, 3 из них пунктиром', () => {
+    const f = flatDrawing(sceneWith('cube'), 0, 0);
+    expect(f.points.filter((p) => !p.ghost).map((p) => p.label)).toEqual(['A', 'B', 'C', 'D', 'A₁', 'B₁', 'C₁', 'D₁']);
+    expect(f.lines).toHaveLength(12);
+    expect(f.lines.filter((l) => l.dashed)).toHaveLength(3);
+    expect(f.lines.every((l) => !l.curve && l.pts.length === 2)).toBe(true);
+  });
+
+  it('плоский чертёж цилиндра: основания — ломаными (не больше 40 опор), очертания — отрезками', () => {
+    const f = flatDrawing(sceneWith('cylinder'), 0, 0);
+    const curves = f.lines.filter((l) => l.curve);
+    expect(curves.length).toBeGreaterThanOrEqual(3);
+    for (const c of curves) expect(c.pts.length).toBeLessThanOrEqual(40);
+    // Верхнее основание видно целиком — замкнутый многоугольник.
+    expect(curves.some((c) => c.closed && !c.dashed)).toBe(true);
+    expect(f.points.filter((p) => !p.ghost).map((p) => p.label)).toEqual(['O', 'O₁']);
+  });
+
+  it('развёртка: размер — по развёртке тела в масштабе сцены; тело удалено — подпись', () => {
+    const scene = obj(sceneWith('cube'));
+    const net = { ...obj(sceneWith('cube')), id: 'n1', type: NET_TYPE, deps: ['s1'], props: netModule.createProps() } as unknown as Parameters<typeof netModule.getLocalBounds>[0];
+    const ctx = { ...rctx, getObject: (id: string) => (id === 's1' ? scene : undefined) } as ResolveContext;
+    const b = netModule.getLocalBounds(net, ctx);
+    const a = 4 * scene.props.scale;
+    expect([Math.round(b.width / a), Math.round(b.height / a)].sort()).toEqual([3, 4]);
+    const gone = { ...net, props: { ...(net.props as NetProps), body: 'zz' } };
+    expect(netModule.getLocalBounds(gone, ctx)).toEqual({ x: 0, y: 0, width: 260, height: 30 });
   });
 });

@@ -5,6 +5,7 @@ import type { BoardObject, ObjectModule, RenderContext } from '@doska/shared';
 import { resolveColor, type CanvasTheme } from '../../objects/colors';
 import { toLocal } from '../../objects/util';
 import { bodySchema, drawScene, fitScale, newBody, type Body, type BodyKind, type Drawing, type HiddenMode, type View } from './solids';
+import { itemSchema, MAX_ITEMS, MAX_POINTS, spaceLayer, spacePointSchema } from './space';
 
 export const PLUGIN_ID = 'math.stereo';
 export const SCENE_TYPE = `${PLUGIN_ID}.scene`;
@@ -19,7 +20,11 @@ export const scenePropsSchema = z.object({
   w: z.number().finite().min(80).max(4000),
   h: z.number().finite().min(80).max(4000),
   yaw: z.number().finite().min(-100).max(100),
-  pitch: z.number().finite().min(-Math.PI / 2).max(Math.PI / 2),
+  pitch: z
+    .number()
+    .finite()
+    .min(-Math.PI / 2)
+    .max(Math.PI / 2),
   /** Пикселей доски на единицу длины сцены. */
   scale: z.number().finite().min(1).max(1000),
   hidden: z.enum(['dashed', 'hide', 'solid']),
@@ -27,6 +32,9 @@ export const scenePropsSchema = z.object({
   frame: z.boolean(),
   labelSize: z.number().finite().min(8).max(60),
   bodies: z.array(bodySchema).max(MAX_BODIES),
+  /** Построения в пространстве (6.4b): точки и отрезки, прямые, плоскости, сечения, измерения. */
+  points: z.array(spacePointSchema).max(MAX_POINTS),
+  items: z.array(itemSchema).max(MAX_ITEMS),
 });
 export type SceneProps = z.infer<typeof scenePropsSchema>;
 
@@ -35,16 +43,7 @@ export const viewOf = (p: SceneProps): View => ({ yaw: p.yaw, pitch: p.pitch, sc
 /** Новая сцена с одним телом, вписанным в рамку. */
 export function sceneWith(kind: BodyKind | null, w = 360, h = 300): SceneProps {
   const bodies = kind ? [newBody(kind, 'b1')] : [];
-  return {
-    w,
-    h,
-    ...TEXTBOOK_VIEW,
-    scale: fitScale(bodies, TEXTBOOK_VIEW, w, h),
-    hidden: 'dashed',
-    frame: false,
-    labelSize: 16,
-    bodies,
-  };
+  return { w, h, ...TEXTBOOK_VIEW, scale: fitScale(bodies, TEXTBOOK_VIEW, w, h), hidden: 'dashed', frame: false, labelSize: 16, bodies, points: [], items: [] };
 }
 
 // Чертёж зависит только от props: кэш по объекту props (он заменяется целиком при правке).
@@ -52,7 +51,7 @@ const cache = new WeakMap<SceneProps, Drawing>();
 export function drawingOf(p: SceneProps): Drawing {
   let d = cache.get(p);
   if (!d) {
-    d = drawScene(p.bodies as Body[], viewOf(p), p.hidden as HiddenMode, p.labelSize * 0.7 + 3);
+    d = drawScene(p.bodies as Body[], viewOf(p), p.hidden as HiddenMode, p.labelSize * 0.7 + 3, p.points.length || p.items.length ? spaceLayer(p) : undefined);
     cache.set(p, d);
   }
   return d;
@@ -60,6 +59,9 @@ export function drawingOf(p: SceneProps): Drawing {
 
 const LINE_W = 1.6;
 const HIDDEN_W = 1.2;
+const ACCENT_W = 2.4;
+/** Значения измерений — мельче подписей и прямым шрифтом. */
+const valueSize = (fs: number) => Math.round(fs * 0.85);
 const dashOf = (zoom: number) => [6 / zoom, 4 / zoom];
 
 function SceneShape({ o, ctx }: { o: BoardObject<SceneProps>; ctx: RenderContext }) {
@@ -86,7 +88,7 @@ function SceneShape({ o, ctx }: { o: BoardObject<SceneProps>; ctx: RenderContext
             key={`l${i}`}
             points={l.pts}
             stroke={col(l.color)}
-            strokeWidth={l.hidden ? HIDDEN_W : LINE_W}
+            strokeWidth={l.accent ? ACCENT_W : l.hidden ? HIDDEN_W : LINE_W}
             dash={l.hidden ? dashOf(ctx.zoom) : undefined}
             lineCap="round"
             lineJoin="round"
@@ -97,9 +99,13 @@ function SceneShape({ o, ctx }: { o: BoardObject<SceneProps>; ctx: RenderContext
         {d.dots.map((t, i) => (
           <Circle key={`d${i}`} x={t.x} y={t.y} radius={2.5 / ctx.zoom} fill={col(t.color)} listening={false} />
         ))}
-        {d.labels.map((t, i) => (
-          <Text key={`t${i}`} x={t.x - fs * 2} y={t.y - fs / 2} width={fs * 4} align="center" text={t.text} fontSize={fs} fontStyle="italic" fill={col(t.color)} listening={false} />
-        ))}
+        {d.labels.map((t, i) =>
+          t.value ? (
+            <Text key={`t${i}`} x={t.x - fs * 10} y={t.y - fs / 2} width={fs * 20} align="center" text={t.text} fontSize={valueSize(fs)} fill={col(t.color)} listening={false} />
+          ) : (
+            <Text key={`t${i}`} x={t.x - fs * 2} y={t.y - fs / 2} width={fs * 4} align="center" text={t.text} fontSize={fs} fontStyle="italic" fill={col(t.color)} listening={false} />
+          ),
+        )}
       </Group>
     </Group>
   );
@@ -119,18 +125,22 @@ export function sceneSvg(p: SceneProps, ox: number, oy: number, theme: CanvasThe
   for (const f of d.fills) out.push(`<polygon points="${pts(f.pts)}" fill="${col(f.color)}" fill-opacity="${f.opacity}"/>`);
   for (const l of d.lines)
     out.push(
-      `<polyline points="${pts(l.pts)}" fill="none" stroke="${col(l.color)}" stroke-width="${l.hidden ? HIDDEN_W : LINE_W}" stroke-linecap="round" stroke-linejoin="round"${l.hidden ? ` stroke-dasharray="${6 * dashScale} ${4 * dashScale}"` : ''}/>`,
+      `<polyline points="${pts(l.pts)}" fill="none" stroke="${col(l.color)}" stroke-width="${l.accent ? ACCENT_W : l.hidden ? HIDDEN_W : LINE_W}" stroke-linecap="round" stroke-linejoin="round"${l.hidden ? ` stroke-dasharray="${6 * dashScale} ${4 * dashScale}"` : ''}/>`,
     );
   for (const t of d.dots) out.push(`<circle cx="${(t.x + cx).toFixed(2)}" cy="${(t.y + cy).toFixed(2)}" r="2.5" fill="${col(t.color)}"/>`);
   for (const t of d.labels)
-    out.push(`<text x="${(t.x + cx).toFixed(2)}" y="${(t.y + cy + p.labelSize * 0.35).toFixed(2)}" text-anchor="middle" font-size="${p.labelSize}" font-style="italic" fill="${col(t.color)}">${esc(t.text)}</text>`);
+    out.push(
+      `<text x="${(t.x + cx).toFixed(2)}" y="${(t.y + cy + p.labelSize * 0.35).toFixed(2)}" text-anchor="middle" font-size="${t.value ? valueSize(p.labelSize) : p.labelSize}"${t.value ? '' : ' font-style="italic"'} fill="${col(t.color)}">${esc(t.text)}</text>`,
+    );
   return out.join('');
 }
 
 export const sceneModule: ObjectModule<SceneProps, ReactNode> = {
   type: SCENE_TYPE,
   title: '3D-сцена',
-  version: 1,
+  // 2 — построения в пространстве (points, items).
+  version: 2,
+  migrate: (props) => ({ points: [], items: [], ...(props as object) }) as unknown as SceneProps,
   propsSchema: scenePropsSchema as unknown as z.ZodType<SceneProps>,
   createProps: () => sceneWith('cube'),
   serialize: (o) => o,

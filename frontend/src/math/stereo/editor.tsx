@@ -5,7 +5,10 @@ import { Dialog } from '../../ui/Dialog';
 import { PALETTE, resolveColor, type CanvasTheme } from '../../objects/colors';
 import { notifySceneCamera, registerSceneCamera } from '../../collab/follow';
 import { MAX_BODIES, SCENE_TYPE, TEXTBOOK_VIEW, sceneSvg, sceneWith, type SceneProps } from './objects';
-import { BODY_KINDS, BODY_TITLES, POLY_BASE_KINDS, ROUND_KINDS, bodyPoints, fitScale, isConvex, newBody, viewDir, type Body, type BodyKind } from './solids';
+import { BODY_KINDS, BODY_TITLES, POLY_BASE_KINDS, ROUND_KINDS, bodyPoints, fitScale, isConvex, keyPoints, newBody, viewDir, type Body, type BodyKind } from './solids';
+import { MAX_ITEMS, MAX_POINTS, bodyOfRef, elemOf, measureOf, nextId as nextSpaceId, nextPointName, pickAt, removeBody, sameRef, sectionOf, type Item, type Space, type SpacePick } from './space';
+import { ITEM_COLORS, MODES, SpacePanel, modeHint, type Mode } from './space-panel';
+import { toast } from '../../store/toast';
 
 const ThreeView = lazy(() => import('./three-view'));
 
@@ -78,7 +81,17 @@ const baseText = (b: Body) => b.base.map(([x, y]) => `${fmt(x)};${fmt(y)}`).join
 function BaseField({ body, onChange }: { body: Body; onChange(base: [number, number][]): void }) {
   const [text, setText] = useState(baseText(body));
   const pts = parseBase(text);
-  const err = !text.trim() ? null : !pts ? 'Пары «x;y» через пробел' : pts.length < 3 ? 'Нужно не меньше трёх вершин' : pts.length > 12 ? 'Не больше 12 вершин' : !isConvex(pts) ? 'Многоугольник должен быть выпуклым' : null;
+  const err = !text.trim()
+    ? null
+    : !pts
+      ? 'Пары «x;y» через пробел'
+      : pts.length < 3
+        ? 'Нужно не меньше трёх вершин'
+        : pts.length > 12
+          ? 'Не больше 12 вершин'
+          : !isConvex(pts)
+            ? 'Многоугольник должен быть выпуклым'
+            : null;
   return (
     <label className="field" style={{ width: '100%' }}>
       <span className="field__label">Своё основание (вершины x;y, пусто — правильный многоугольник)</span>
@@ -95,7 +108,11 @@ function BaseField({ body, onChange }: { body: Body; onChange(base: [number, num
           else if (p && p.length >= 3 && p.length <= 12 && isConvex(p)) onChange(p);
         }}
       />
-      {err && <span className="small" style={{ color: 'var(--danger)' }}>{err}</span>}
+      {err && (
+        <span className="small" style={{ color: 'var(--danger)' }}>
+          {err}
+        </span>
+      )}
     </label>
   );
 }
@@ -118,7 +135,9 @@ function ColorSelect({ label, value, onChange }: { label: string; value: string;
 /** Параметры тела по его виду. */
 function BodyFields({ body, set }: { body: Body; set(patch: Partial<Body>): void }) {
   const f: ReactNode[] = [];
-  const S = (key: 'a' | 'b' | 'h' | 'r' | 'r2', label: string, title?: string) => <NumField key={key} label={label} title={title} value={body[key]} min={0.05} max={1000} onChange={(v) => set({ [key]: v })} />;
+  const S = (key: 'a' | 'b' | 'h' | 'r' | 'r2', label: string, title?: string) => (
+    <NumField key={key} label={label} title={title} value={body[key]} min={0.05} max={1000} onChange={(v) => set({ [key]: v })} />
+  );
   const regular = POLY_BASE_KINDS.includes(body.kind) && body.base.length < 3;
   switch (body.kind) {
     case 'cube':
@@ -142,7 +161,15 @@ function BodyFields({ body, set }: { body: Body; set(patch: Partial<Body>): void
         f.push(
           <NumField key="n" label="Сторон n" value={body.n} min={3} max={12} width={80} onChange={(v) => set({ n: Math.round(v) })} />,
           // Сторона правильного основания: a = 2R·sin(π/n), хранится радиус R.
-          <NumField key="side" label="Сторона основания" value={2 * body.r * Math.sin(Math.PI / body.n)} min={0.05} max={1000} width={130} onChange={(v) => set({ r: v / (2 * Math.sin(Math.PI / body.n)) })} />,
+          <NumField
+            key="side"
+            label="Сторона основания"
+            value={2 * body.r * Math.sin(Math.PI / body.n)}
+            min={0.05}
+            max={1000}
+            width={130}
+            onChange={(v) => set({ r: v / (2 * Math.sin(Math.PI / body.n)) })}
+          />,
         );
       }
       f.push(S('h', 'Высота h'));
@@ -186,7 +213,14 @@ function BodyFields({ body, set }: { body: Body; set(patch: Partial<Body>): void
       <div className="stereo-fields">
         <label className="field" style={{ flex: 1, minWidth: 160 }}>
           <span className="field__label">Свои подписи через запятую</span>
-          <input className="input" aria-label="Подписи вершин" maxLength={200} value={body.labels} placeholder={ROUND_KINDS.includes(body.kind) ? 'O, O₁' : 'A, B, C, …'} onChange={(e) => set({ labels: e.target.value })} />
+          <input
+            className="input"
+            aria-label="Подписи вершин"
+            maxLength={200}
+            value={body.labels}
+            placeholder={ROUND_KINDS.includes(body.kind) ? 'O, O₁' : 'A, B, C, …'}
+            onChange={(e) => set({ labels: e.target.value })}
+          />
         </label>
       </div>
       <div className="row" style={{ gap: 16, flexWrap: 'wrap' }}>
@@ -235,6 +269,10 @@ export function StereoEditor({ objectId, at, ctx, close, readOnly, subscribeObje
   const [sel, setSel] = useState(0);
   const [glFailed, setGlFailed] = useState(false);
   const [addKind, setAddKind] = useState<BodyKind>('cube');
+  const [tab, setTab] = useState<'bodies' | 'space'>('bodies');
+  const [mode, setMode] = useState<Mode>('rotate');
+  /** Выбранные для построения точки и построения (id) — по порядку. */
+  const [picks, setPicks] = useState<string[]>([]);
   const propsRef = useRef(props);
   propsRef.current = props;
 
@@ -315,15 +353,25 @@ export function StereoEditor({ objectId, at, ctx, close, readOnly, subscribeObje
 
   // Вращение: протяжка (мышь, перо, палец), масштаб: колесо и щипок.
   const pointers = useRef(new Map<number, { x: number; y: number }>());
+  /** Начало жеста и пройденный путь: короткий жест без сдвига — щелчок (выбор точки). */
+  const gesture = useRef<{ x: number; y: number; moved: number; multi: boolean } | null>(null);
   const onDown = (e: RPointerEvent) => {
     (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
     pointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (pointers.current.size === 1) gesture.current = { x: e.clientX, y: e.clientY, moved: 0, multi: false };
+    else if (gesture.current) gesture.current.multi = true;
   };
   const onMove = (e: RPointerEvent) => {
     const ps = pointers.current;
     const prev = ps.get(e.pointerId);
     if (!prev) return;
     const cur = { x: e.clientX, y: e.clientY };
+    if (gesture.current) gesture.current.moved += Math.hypot(cur.x - prev.x, cur.y - prev.y);
+    // Пока жест похож на щелчок, вид не трогаем.
+    if (mode !== 'rotate' && gesture.current && gesture.current.moved < 4 && ps.size < 2) {
+      ps.set(e.pointerId, cur);
+      return;
+    }
     if (ps.size >= 2) {
       const other = [...ps.entries()].find(([k]) => k !== e.pointerId)![1];
       const d0 = Math.hypot(prev.x - other.x, prev.y - other.y);
@@ -338,6 +386,92 @@ export function StereoEditor({ objectId, at, ctx, close, readOnly, subscribeObje
   };
   const onUp = (e: RPointerEvent) => {
     pointers.current.delete(e.pointerId);
+    const g = gesture.current;
+    if (pointers.current.size === 0) gesture.current = null;
+    if (!g || g.multi || g.moved >= 4 || mode === 'rotate' || readOnly || e.type === 'pointercancel') return;
+    const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    onPick(e.clientX - r.left - VW / 2, e.clientY - r.top - VH / 2);
+  };
+
+  // Выбор щелчком: точки, вершины, рёбра, грани; построения — когда выбраны все опоры.
+  const onPick = (x: number, y: number) => {
+    const p = propsRef.current;
+    const kk = editorK(p);
+    const need = MODES.find((m) => m.mode === mode)!.need;
+    const measures = mode === 'dist' || mode === 'angle';
+    const hit: SpacePick | null = pickAt(p, { yaw: p.yaw, pitch: p.pitch, scale: p.scale * kk }, x, y, { items: measures });
+    if (!hit) return;
+    let points = p.points;
+    let pickId: string;
+    if (hit.kind === 'ref') {
+      const same = points.find((q) => sameRef(q.at, hit.ref));
+      if (same) pickId = same.id;
+      else {
+        if (points.length >= MAX_POINTS) {
+          toast.info(`В сцене не больше ${MAX_POINTS} точек`);
+          return;
+        }
+        pickId = nextSpaceId('p', points);
+        // Точка на вершине называется, как вершина (A, B₁, S): отрезок — «AB₁», а не «NP».
+        const vb = hit.ref.k === 'vertex' ? (p.bodies as Body[]).find((b) => b.id === (hit.ref as { body: string }).body) : undefined;
+        const name = vb && hit.ref.k === 'vertex' ? (keyPoints(vb)[hit.ref.i]?.name ?? nextPointName(p)) : nextPointName(p);
+        points = [...points, { id: pickId, name, at: hit.ref, color: 'ink' }];
+      }
+    } else pickId = hit.id;
+    if (mode === 'point') {
+      if (points !== p.points) update((q) => ({ ...q, points }));
+      return;
+    }
+    if (picks.includes(pickId)) return;
+    const chosen = [...picks, pickId];
+    if (chosen.length < need) {
+      if (points !== p.points) update((q) => ({ ...q, points }));
+      setPicks(chosen);
+      return;
+    }
+    setPicks([]);
+    const sp: Space = { bodies: p.bodies as Body[], points, items: p.items };
+    if (sp.items.length >= MAX_ITEMS) {
+      toast.info(`В сцене не больше ${MAX_ITEMS} построений`);
+      return;
+    }
+    const iid = nextSpaceId('i', sp.items);
+    const kind = mode as Item['k'];
+    const color = ITEM_COLORS[kind];
+    let item: Item;
+    if (kind === 'segment' || kind === 'line') item = { id: iid, k: kind, a: chosen[0]!, b: chosen[1]!, color };
+    else if (kind === 'plane' || kind === 'section') {
+      const [a, b, c] = chosen as [string, string, string];
+      if (kind === 'plane') item = { id: iid, k: 'plane', a, b, c, color, opacity: 0.15 };
+      else {
+        const body =
+          chosen
+            .map((cid) => points.find((q) => q.id === cid))
+            .map((q) => (q ? bodyOfRef(q.at) : null))
+            .find(Boolean) ?? sp.bodies[0]?.id;
+        if (!body) return;
+        item = { id: iid, k: 'section', body, a, b, c, color, opacity: 0.25 };
+      }
+      if (!elemOf({ ...sp, items: [...sp.items, item] }, iid)) {
+        toast.info('Три точки лежат на одной прямой — плоскость не определена');
+        if (points !== p.points) update((q) => ({ ...q, points }));
+        return;
+      }
+      if (item.k === 'section' && !sectionOf({ ...sp, items: [item] }, item)) {
+        toast.info('Плоскость не пересекает тело');
+        if (points !== p.points) update((q) => ({ ...q, points }));
+        return;
+      }
+    } else {
+      const m: Extract<Item, { k: 'dist' | 'angle' }> = { id: iid, k: kind as 'dist' | 'angle', x: chosen[0]!, y: chosen[1]!, color };
+      item = m;
+      if (!measureOf({ ...sp, items: [...sp.items, m] }, m)) {
+        toast.info(kind === 'angle' ? 'Угол измеряется между прямыми и плоскостями' : 'Расстояние не определено');
+        if (points !== p.points) update((q) => ({ ...q, points }));
+        return;
+      }
+    }
+    update((q) => ({ ...q, points, items: [...q.items, item] }));
   };
   const wheelHost = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -359,6 +493,7 @@ export function StereoEditor({ objectId, at, ctx, close, readOnly, subscribeObje
   const frameH = props.h * k;
   const colorOf = useCallback((b: Body) => resolveColor(b.fill, theme), [theme]);
 
+  const pickNames = picks.map((pid) => props.points.find((q) => q.id === pid)?.name || elemOf(props as Space, pid)?.name || '?');
   const body = props.bodies[Math.min(sel, props.bodies.length - 1)];
   const bodyIndex = Math.min(sel, props.bodies.length - 1);
 
@@ -376,7 +511,7 @@ export function StereoEditor({ objectId, at, ctx, close, readOnly, subscribeObje
     close();
   };
 
-  const deg = (v: number) => Math.round(((v / DEG) % 360 + 540) % 360 - 180);
+  const deg = (v: number) => Math.round(((((v / DEG) % 360) + 540) % 360) - 180);
 
   return (
     <Dialog
@@ -406,7 +541,8 @@ export function StereoEditor({ objectId, at, ctx, close, readOnly, subscribeObje
             className="stereo-view"
             style={{ width: VW, height: VH }}
             role="application"
-            aria-label="Сцена: протяните, чтобы повернуть; колесо — масштаб"
+            aria-label="Сцена: протяните, чтобы повернуть; колесо — масштаб; щелчок — выбор в режиме построения"
+            data-mode={mode}
             onPointerDown={onDown}
             onPointerMove={onMove}
             onPointerUp={onUp}
@@ -441,69 +577,97 @@ export function StereoEditor({ objectId, at, ctx, close, readOnly, subscribeObje
           <p className="small muted" aria-live="polite">
             Поворот {deg(props.yaw)}°, наклон {deg(props.pitch)}°. Пунктирная рамка — граница сцены на доске.
           </p>
+          {!readOnly && mode !== 'rotate' && (
+            <p className="small stereo-hint" data-testid="stereo-hint">
+              {modeHint(mode, pickNames)}
+            </p>
+          )}
         </div>
 
         <fieldset className="stereo-panel" disabled={readOnly}>
           {readOnly && <p className="small muted">Сцену можно вращать и приближать у себя; изменить её может только автор или учитель.</p>}
-          <div className="stereo-fields">
-            <label className="field" style={{ flex: 1 }}>
-              <span className="field__label">Тело</span>
-              <select className="select" aria-label="Тело сцены" value={bodyIndex} onChange={(e) => setSel(Number(e.target.value))} disabled={!props.bodies.length}>
-                {props.bodies.map((b, i) => (
-                  <option key={b.id} value={i}>
-                    {i + 1}. {BODY_TITLES[b.kind]}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <Button
-              size="small"
-              disabled={!body}
-              onClick={() => {
-                update((p) => ({ ...p, bodies: p.bodies.filter((_, i) => i !== bodyIndex) }));
-                setSel(Math.max(0, bodyIndex - 1));
-              }}
-            >
-              Удалить тело
+          <div className="stereo-tabs" role="tablist">
+            <Button size="small" role="tab" aria-selected={tab === 'bodies'} variant={tab === 'bodies' ? 'primary' : undefined} onClick={() => setTab('bodies')}>
+              Тела
+            </Button>
+            <Button size="small" role="tab" aria-selected={tab === 'space'} variant={tab === 'space' ? 'primary' : undefined} onClick={() => setTab('space')}>
+              Построения
             </Button>
           </div>
-          {body ? <BodyFields key={body.id} body={body} set={(patch) => setBody(bodyIndex, patch)} /> : <p className="muted">В сцене нет тел — добавьте тело ниже.</p>}
-          <hr className="stereo-sep" />
-          <div className="stereo-fields">
-            <label className="field" style={{ flex: 1 }}>
-              <span className="field__label">Добавить тело</span>
-              <select className="select" aria-label="Вид нового тела" value={addKind} onChange={(e) => setAddKind(e.target.value as BodyKind)}>
-                {BODY_KINDS.map((kk) => (
-                  <option key={kk} value={kk}>
-                    {BODY_TITLES[kk]}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <Button
-              size="small"
-              disabled={props.bodies.length >= MAX_BODIES}
-              onClick={() => {
-                update((p) => {
-                  const bodies = [...p.bodies, placeNew(addKind, p.bodies)];
-                  return { ...p, bodies, scale: fitScale(bodies, p, p.w, p.h) };
-                });
-                setSel(props.bodies.length);
+          {tab === 'space' ? (
+            <SpacePanel
+              space={props as unknown as Space}
+              set={(next) => update((p) => ({ ...p, ...next }))}
+              mode={mode}
+              setMode={(m) => {
+                setMode(m);
+                setPicks([]);
               }}
-            >
-              Добавить
-            </Button>
-          </div>
-          <div className="stereo-fields">
-            <label className="field" style={{ flex: 1 }}>
-              <span className="field__label">Невидимые линии</span>
-              <select className="select" aria-label="Невидимые линии" value={props.hidden} onChange={(e) => update((p) => ({ ...p, hidden: e.target.value as SceneProps['hidden'] }))}>
-                <option value="dashed">Пунктиром</option>
-                <option value="hide">Скрыть</option>
-                <option value="solid">Сплошными</option>
-              </select>
-            </label>
-          </div>
+            />
+          ) : (
+            <>
+              <div className="stereo-fields">
+                <label className="field" style={{ flex: 1 }}>
+                  <span className="field__label">Тело</span>
+                  <select className="select" aria-label="Тело сцены" value={bodyIndex} onChange={(e) => setSel(Number(e.target.value))} disabled={!props.bodies.length}>
+                    {props.bodies.map((b, i) => (
+                      <option key={b.id} value={i}>
+                        {i + 1}. {BODY_TITLES[b.kind]}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <Button
+                  size="small"
+                  disabled={!body}
+                  onClick={() => {
+                    // Точки на теле и построения на них уходят вместе с телом.
+                    update((p) => ({ ...p, ...removeBody(p as unknown as Space, p.bodies[bodyIndex]!.id) }));
+                    setSel(Math.max(0, bodyIndex - 1));
+                  }}
+                >
+                  Удалить тело
+                </Button>
+              </div>
+              {body ? <BodyFields key={body.id} body={body} set={(patch) => setBody(bodyIndex, patch)} /> : <p className="muted">В сцене нет тел — добавьте тело ниже.</p>}
+              <hr className="stereo-sep" />
+              <div className="stereo-fields">
+                <label className="field" style={{ flex: 1 }}>
+                  <span className="field__label">Добавить тело</span>
+                  <select className="select" aria-label="Вид нового тела" value={addKind} onChange={(e) => setAddKind(e.target.value as BodyKind)}>
+                    {BODY_KINDS.map((kk) => (
+                      <option key={kk} value={kk}>
+                        {BODY_TITLES[kk]}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <Button
+                  size="small"
+                  disabled={props.bodies.length >= MAX_BODIES}
+                  onClick={() => {
+                    update((p) => {
+                      const bodies = [...p.bodies, placeNew(addKind, p.bodies)];
+                      return { ...p, bodies, scale: fitScale(bodies, p, p.w, p.h) };
+                    });
+                    setSel(props.bodies.length);
+                  }}
+                >
+                  Добавить
+                </Button>
+              </div>
+              <div className="stereo-fields">
+                <label className="field" style={{ flex: 1 }}>
+                  <span className="field__label">Невидимые линии</span>
+                  <select className="select" aria-label="Невидимые линии" value={props.hidden} onChange={(e) => update((p) => ({ ...p, hidden: e.target.value as SceneProps['hidden'] }))}>
+                    <option value="dashed">Пунктиром</option>
+                    <option value="hide">Скрыть</option>
+                    <option value="solid">Сплошными</option>
+                  </select>
+                </label>
+              </div>
+            </>
+          )}
         </fieldset>
       </div>
     </Dialog>

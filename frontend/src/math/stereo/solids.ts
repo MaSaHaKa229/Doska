@@ -12,16 +12,16 @@ import { z } from 'zod';
 
 export type V3 = [number, number, number];
 
-const add = (a: V3, b: V3): V3 => [a[0] + b[0], a[1] + b[1], a[2] + b[2]];
-const sub = (a: V3, b: V3): V3 => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
-const mul = (a: V3, k: number): V3 => [a[0] * k, a[1] * k, a[2] * k];
+export const add = (a: V3, b: V3): V3 => [a[0] + b[0], a[1] + b[1], a[2] + b[2]];
+export const sub = (a: V3, b: V3): V3 => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
+export const mul = (a: V3, k: number): V3 => [a[0] * k, a[1] * k, a[2] * k];
 export const dot = (a: V3, b: V3) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
-const cross = (a: V3, b: V3): V3 => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
-const norm = (a: V3): V3 => {
+export const cross = (a: V3, b: V3): V3 => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
+export const norm = (a: V3): V3 => {
   const l = Math.hypot(a[0], a[1], a[2]) || 1;
   return [a[0] / l, a[1] / l, a[2] / l];
 };
-const lerp = (a: V3, b: V3, t: number): V3 => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
+export const lerp = (a: V3, b: V3, t: number): V3 => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
 
 // =====================================================================
 //  Тела
@@ -134,10 +134,11 @@ export function newBody(kind: BodyKind, id: string): Body {
 
 type P2 = [number, number];
 
-const area2 = (pts: P2[]) => pts.reduce((s, p, i) => {
-  const q = pts[(i + 1) % pts.length]!;
-  return s + p[0] * q[1] - q[0] * p[1];
-}, 0) / 2;
+const area2 = (pts: P2[]) =>
+  pts.reduce((s, p, i) => {
+    const q = pts[(i + 1) % pts.length]!;
+    return s + p[0] * q[1] - q[0] * p[1];
+  }, 0) / 2;
 
 /** Многоугольник выпуклый (без самопересечений и вырожденных вершин)? */
 export function isConvex(pts: readonly P2[]): boolean {
@@ -161,8 +162,20 @@ export function isConvex(pts: readonly P2[]): boolean {
 
 /** Основание тела против часовой стрелки (вид сверху), с центром масс вершин в (0, 0) у правильного. */
 export function basePolygon(b: Body): P2[] {
-  if (b.kind === 'cube') return [[-b.a / 2, -b.a / 2], [b.a / 2, -b.a / 2], [b.a / 2, b.a / 2], [-b.a / 2, b.a / 2]];
-  if (b.kind === 'box') return [[-b.a / 2, -b.b / 2], [b.a / 2, -b.b / 2], [b.a / 2, b.b / 2], [-b.a / 2, b.b / 2]];
+  if (b.kind === 'cube')
+    return [
+      [-b.a / 2, -b.a / 2],
+      [b.a / 2, -b.a / 2],
+      [b.a / 2, b.a / 2],
+      [-b.a / 2, b.a / 2],
+    ];
+  if (b.kind === 'box')
+    return [
+      [-b.a / 2, -b.b / 2],
+      [b.a / 2, -b.b / 2],
+      [b.a / 2, b.b / 2],
+      [-b.a / 2, b.b / 2],
+    ];
   if (b.base.length >= 3) {
     const pts = b.base.map((p) => [p[0], p[1]] as P2);
     return area2(pts) < 0 ? pts.reverse() : pts;
@@ -247,7 +260,13 @@ export function bodyPoints(b: Body): V3[] {
     return [-1, 1].flatMap((sx) => [-1, 1].flatMap((sy) => [-1, 1].map((sz) => [px + sx * r, py + sy * r, pz + sz * r] as V3)));
   }
   const { r1, r2, h } = roundDims(b);
-  const ring = (r: number, z: number): V3[] => [[r, 0], [-r, 0], [0, r], [0, -r]].map(([x, y]) => [px + x!, py + y!, pz + z] as V3);
+  const ring = (r: number, z: number): V3[] =>
+    [
+      [r, 0],
+      [-r, 0],
+      [0, r],
+      [0, -r],
+    ].map(([x, y]) => [px + x!, py + y!, pz + z] as V3);
   return [...ring(r1, 0), ...(r2 > 0 ? ring(r2, h) : [[px, py, pz + h] as V3])];
 }
 
@@ -286,10 +305,11 @@ export function sceneCenter(bodies: readonly Body[]): V3 {
   if (!pts.length) return [0, 0, 0];
   const lo: V3 = [Infinity, Infinity, Infinity];
   const hi: V3 = [-Infinity, -Infinity, -Infinity];
-  for (const p of pts) for (let i = 0; i < 3; i++) {
-    lo[i] = Math.min(lo[i]!, p[i]!);
-    hi[i] = Math.max(hi[i]!, p[i]!);
-  }
+  for (const p of pts)
+    for (let i = 0; i < 3; i++) {
+      lo[i] = Math.min(lo[i]!, p[i]!);
+      hi[i] = Math.max(hi[i]!, p[i]!);
+    }
   return mul(add(lo, hi), 0.5);
 }
 
@@ -332,7 +352,10 @@ function clipSlab(p: number, d: number, lo: number, hi: number, iv: [number, num
 
 /** Выпуклый многогранник как пересечение полупространств, сжатый на eps. */
 function polyOccluder(ph: Polyhedron, eps: number): Occluder {
-  const c = mul(ph.verts.reduce((s, v) => add(s, v), [0, 0, 0] as V3), 1 / ph.verts.length);
+  const c = mul(
+    ph.verts.reduce((s, v) => add(s, v), [0, 0, 0] as V3),
+    1 / ph.verts.length,
+  );
   const planes = ph.faces.map((f) => {
     const a = ph.verts[f[0]!]!;
     let n = norm(cross(sub(ph.verts[f[1]!]!, a), sub(ph.verts[f[2]!]!, a)));
@@ -429,6 +452,8 @@ export interface DrawLine {
   pts: number[];
   hidden: boolean;
   color: string;
+  /** Линия измерения (общий перпендикуляр, расстояние) — толще. */
+  accent?: boolean;
 }
 
 export interface DrawFill {
@@ -444,6 +469,21 @@ export interface DrawLabel {
   color: string;
   /** Подпись невидимой вершины. */
   hidden: boolean;
+  /** Значение (расстояние, угол): прямым шрифтом, а не курсивом, как имя точки. */
+  value?: boolean;
+}
+
+/**
+ * Дополнительный слой чертежа — построения в пространстве (6.4b): линии с
+ * той же проверкой видимости, заливки (сечения, плоскости), точки с
+ * подписями и значения измерений. Координаты — точки сцены.
+ */
+export interface ExtraLayer {
+  /** Ломаные; tol — допуск видимости (линия на приближённой поверхности тела вращения). */
+  lines: { pts: V3[]; color: string; tol?: number; accent?: boolean }[];
+  fills: { pts: V3[]; color: string; opacity: number }[];
+  points: { p: V3; name: string; color: string }[];
+  values: { p: V3; text: string; color: string }[];
 }
 
 export interface Drawing {
@@ -462,6 +502,9 @@ interface Feature {
   /** Кривая: выводится ломаной по всем точкам выборки. */
   curve: boolean;
   color: string;
+  /** Допуск видимости: точки чуть внутри тела (хорды приближённой поверхности) не считаются закрытыми. */
+  tol?: number;
+  accent?: boolean;
 }
 
 const RING = 72;
@@ -535,7 +578,12 @@ function roundMarks(b: Body): { p: V3; name: string; dot: boolean }[] {
   if (b.kind === 'sphere') return b.axis ? [{ p: pos, name: 'O', dot: true }] : [];
   const top = add(pos, [0, 0, b.h]);
   if (b.kind === 'cone') return [{ p: top, name: 'S', dot: false }, ...(b.axis ? [{ p: pos, name: 'O', dot: true }] : [])];
-  return b.axis ? [{ p: pos, name: 'O', dot: true }, { p: top, name: 'O₁', dot: true }] : [];
+  return b.axis
+    ? [
+        { p: pos, name: 'O', dot: true },
+        { p: top, name: 'O₁', dot: true },
+      ]
+    : [];
 }
 
 function hull2(pts: { x: number; y: number }[]): { x: number; y: number }[] {
@@ -567,20 +615,20 @@ function bodyExtent(bodies: readonly Body[]): number {
  * Чертёж сцены: грани (полупрозрачная заливка видимых граней), линии с
  * делением на видимые и невидимые куски, подписи вершин.
  */
-export function drawScene(bodies: readonly Body[], view: View, hidden: HiddenMode = 'dashed', labelGap = 12): Drawing {
+export function drawScene(bodies: readonly Body[], view: View, hidden: HiddenMode = 'dashed', labelGap = 12, extra?: ExtraLayer): Drawing {
   const proj = projection(view, sceneCenter(bodies));
   const eps = bodyExtent(bodies) * 1e-6;
   const occluders = bodies.map((b) => occluderOf(b, eps));
-  const visible = (p: V3) => {
+  const visible = (p: V3, tol = 0) => {
     for (const occ of occluders) {
       const iv = occ(p, proj.d);
-      if (iv && iv[1] > Math.max(iv[0], 0) + eps) return false;
+      if (iv && iv[1] > Math.max(iv[0], 0) + eps + tol) return false;
     }
     return true;
   };
 
   const lines: DrawLine[] = [];
-  const pushRun = (pts: V3[], isHidden: boolean, color: string) => {
+  const pushRun = (pts: V3[], isHidden: boolean, color: string, accent?: boolean) => {
     if (pts.length < 2) return;
     if (isHidden && hidden === 'hide') return;
     const flat = pts.flatMap((p) => {
@@ -589,11 +637,18 @@ export function drawScene(bodies: readonly Body[], view: View, hidden: HiddenMod
     });
     const last = lines[lines.length - 1];
     // Продолжение предыдущего куска того же вида — одна ломаная.
-    if (last && last.hidden === (isHidden && hidden === 'dashed') && last.color === color && last.pts[last.pts.length - 2] === flat[0] && last.pts[last.pts.length - 1] === flat[1]) {
+    if (
+      last &&
+      last.hidden === (isHidden && hidden === 'dashed') &&
+      last.color === color &&
+      !!last.accent === !!accent &&
+      last.pts[last.pts.length - 2] === flat[0] &&
+      last.pts[last.pts.length - 1] === flat[1]
+    ) {
       last.pts.push(...flat.slice(2));
       return;
     }
-    lines.push({ pts: flat, hidden: isHidden && hidden === 'dashed', color });
+    lines.push({ pts: flat, hidden: isHidden && hidden === 'dashed', color, ...(accent ? { accent } : {}) });
   };
 
   /** Делит линию на видимые и невидимые куски (выборка и уточнение границы делением пополам). */
@@ -602,7 +657,7 @@ export function drawScene(bodies: readonly Body[], view: View, hidden: HiddenMod
     const p1 = proj.project(f.at(f.curve ? 0.5 : 1));
     const n = f.curve ? 4 * RING : Math.max(2, Math.min(64, Math.ceil(Math.hypot(p1.x - p0.x, p1.y - p0.y) / 6)));
     // Концы отрезка проверяются чуть внутри: вершина лежит сразу на нескольких гранях.
-    const probe = (t: number) => visible(f.at(f.curve ? t : Math.min(1 - 1e-4, Math.max(1e-4, t))));
+    const probe = (t: number) => visible(f.at(f.curve ? t : Math.min(1 - 1e-4, Math.max(1e-4, t))), f.tol);
     let prevVis = probe(0);
     let run: V3[] = [f.at(0)];
     for (let i = 1; i <= n; i++) {
@@ -618,13 +673,13 @@ export function drawScene(bodies: readonly Body[], view: View, hidden: HiddenMod
         }
         const cut = f.at((lo + hi) / 2);
         run.push(cut);
-        pushRun(run, !prevVis, f.color);
+        pushRun(run, !prevVis, f.color, f.accent);
         run = [cut];
         prevVis = vis;
       }
       if (f.curve || i === n) run.push(f.at(t));
     }
-    pushRun(run, !prevVis, f.color);
+    pushRun(run, !prevVis, f.color, f.accent);
   };
 
   const fills: { fill: DrawFill; depth: number }[] = [];
@@ -642,17 +697,21 @@ export function drawScene(bodies: readonly Body[], view: View, hidden: HiddenMod
   for (const b of bodies) {
     const fs = [...features(b, proj), ...axisFeatures(b)];
     fs.forEach(splitLine);
-    for (const f of fs) for (const p of featurePoints(f)) {
-      const q = proj.project(p);
-      grow(q.x, q.y);
-    }
+    for (const f of fs)
+      for (const p of featurePoints(f)) {
+        const q = proj.project(p);
+        grow(q.x, q.y);
+      }
     const centerDepth = dot(sceneCenterOf(b), proj.d);
 
     // Заливка видимых граней.
     if (b.opacity > 0) {
       if (isPolyhedron(b.kind)) {
         const ph = polyhedron(b);
-        const c = mul(ph.verts.reduce((s, v) => add(s, v), [0, 0, 0] as V3), 1 / ph.verts.length);
+        const c = mul(
+          ph.verts.reduce((s, v) => add(s, v), [0, 0, 0] as V3),
+          1 / ph.verts.length,
+        );
         for (const f of ph.faces) {
           const a = ph.verts[f[0]!]!;
           let n = cross(sub(ph.verts[f[1]!]!, a), sub(ph.verts[f[2]!]!, a));
@@ -661,7 +720,13 @@ export function drawScene(bodies: readonly Body[], view: View, hidden: HiddenMod
           fills.push({ fill: { pts: f.flatMap((i) => Object.values(proj.project(ph.verts[i]!))), color: b.fill, opacity: b.opacity }, depth: centerDepth });
         }
       } else {
-        const outline = b.kind === 'sphere' ? circle(b.pos as V3, proj.e1, proj.e2, b.r, 64) : features(b, proj).slice(0, 2).flatMap(featurePoints).concat(b.kind === 'cone' ? [add(b.pos as V3, [0, 0, b.h])] : []);
+        const outline =
+          b.kind === 'sphere'
+            ? circle(b.pos as V3, proj.e1, proj.e2, b.r, 64)
+            : features(b, proj)
+                .slice(0, 2)
+                .flatMap(featurePoints)
+                .concat(b.kind === 'cone' ? [add(b.pos as V3, [0, 0, b.h])] : []);
         const h = hull2(outline.map((p) => proj.project(p)));
         fills.push({ fill: { pts: h.flatMap((q) => [q.x, q.y]), color: b.fill, opacity: b.opacity }, depth: centerDepth });
       }
@@ -675,7 +740,10 @@ export function drawScene(bodies: readonly Body[], view: View, hidden: HiddenMod
             return ph.verts.map((p, i) => ({ p, name: ph.names[i]!, dot: false }));
           })()
         : roundMarks(b);
-      const names = labelsOf(b, marks.map((m) => m.name));
+      const names = labelsOf(
+        b,
+        marks.map((m) => m.name),
+      );
       const c2 = proj.project(sceneCenterOf(b));
       marks.forEach((m, i) => {
         const q = proj.project(m.p);
@@ -688,16 +756,41 @@ export function drawScene(bodies: readonly Body[], view: View, hidden: HiddenMod
         if (m.dot) dots.push({ x: q.x, y: q.y, color: b.edge });
       });
     } else {
-      for (const m of roundMarks(b)) if (m.dot) {
-        const q = proj.project(m.p);
-        dots.push({ x: q.x, y: q.y, color: b.edge });
-      }
+      for (const m of roundMarks(b))
+        if (m.dot) {
+          const q = proj.project(m.p);
+          dots.push({ x: q.x, y: q.y, color: b.edge });
+        }
     }
   }
 
   fills.sort((a, b) => a.depth - b.depth);
+
+  // Построения: поверх тел, заливки — после граней.
+  const extraFills: DrawFill[] = [];
+  if (extra) {
+    for (const f of extra.fills) extraFills.push({ pts: f.pts.flatMap((p) => Object.values(proj.project(p))), color: f.color, opacity: f.opacity });
+    for (const l of extra.lines) for (let i = 0; i + 1 < l.pts.length; i++) splitLine({ ...segment(l.pts[i]!, l.pts[i + 1]!, l.color), tol: l.tol, accent: l.accent });
+    for (const pt of extra.points) {
+      const q = proj.project(pt.p);
+      grow(q.x, q.y);
+      dots.push({ x: q.x, y: q.y, color: pt.color });
+      if (pt.name) labels.push({ x: q.x + labelGap * 0.6, y: q.y - labelGap * 0.6, text: pt.name, color: pt.color, hidden: !visible(pt.p) });
+    }
+    // Значения не налезают друг на друга: следующее — строкой ниже (ширина — по числу знаков).
+    const placed: { x: number; y: number; w: number }[] = [];
+    const lineH = labelGap * 1.25;
+    for (const v of extra.values) {
+      const q = proj.project(v.p);
+      const w = v.text.length * labelGap * 0.6;
+      let y = q.y - labelGap * 0.8;
+      while (placed.some((o) => Math.abs(o.y - y) < lineH && Math.abs(o.x - q.x) < (o.w + w) / 2)) y += lineH;
+      placed.push({ x: q.x, y, w });
+      labels.push({ x: q.x, y, text: v.text, color: v.color, hidden: false, value: true });
+    }
+  }
   const bounds = Number.isFinite(lo.x) ? { x: lo.x, y: lo.y, width: hi.x - lo.x, height: hi.y - lo.y } : { x: 0, y: 0, width: 0, height: 0 };
-  return { fills: fills.map((f) => f.fill), lines, labels, dots, bounds };
+  return { fills: [...fills.map((f) => f.fill), ...extraFills], lines, labels, dots, bounds };
 }
 
 /** Центр тела (для порядка заливки и направления подписей). */
@@ -727,7 +820,10 @@ export function fitScale(bodies: readonly Body[], view: Omit<View, 'scale'>, w: 
 /** Сетка тела для 3D-редактора: треугольники (позиции по 9 чисел) — только многогранники. */
 export function polyTriangles(b: Body): number[] {
   const ph = polyhedron(b);
-  const c = mul(ph.verts.reduce((s, v) => add(s, v), [0, 0, 0] as V3), 1 / ph.verts.length);
+  const c = mul(
+    ph.verts.reduce((s, v) => add(s, v), [0, 0, 0] as V3),
+    1 / ph.verts.length,
+  );
   const out: number[] = [];
   for (const f of ph.faces) {
     const a = ph.verts[f[0]!]!;
@@ -740,6 +836,61 @@ export function polyTriangles(b: Body): number[] {
     }
   }
   return out;
+}
+
+/**
+ * Выпуклый многогранник, приближающий тело вращения (для сечений): цилиндр
+ * и усечённый конус — призма и усечённая пирамида с n гранями, конус —
+ * пирамида. Вершины лежат на поверхности тела. Шар — отдельно (сечение — круг).
+ */
+export function convexPolyhedron(b: Body, n = 72): Polyhedron {
+  if (isPolyhedron(b.kind)) return polyhedron(b);
+  const { r1, r2, h } = roundDims(b);
+  const [px, py, pz] = b.pos;
+  const ring = (r: number, z: number): V3[] => Array.from({ length: n }, (_, i) => [px + r * Math.cos((2 * Math.PI * i) / n), py + r * Math.sin((2 * Math.PI * i) / n), pz + z] as V3);
+  const bottom = ring(r1, 0);
+  const edges: [number, number][] = [];
+  for (let i = 0; i < n; i++) edges.push([i, (i + 1) % n]);
+  const bottomFace = Array.from({ length: n }, (_, i) => n - 1 - i);
+  if (r2 <= 0) {
+    for (let i = 0; i < n; i++) edges.push([i, n]);
+    return { verts: [...bottom, [px, py, pz + h]], faces: [bottomFace, ...Array.from({ length: n }, (_, i) => [i, (i + 1) % n, n])], edges, names: [] };
+  }
+  for (let i = 0; i < n; i++) edges.push([n + i, n + ((i + 1) % n)], [i, n + i]);
+  return {
+    verts: [...bottom, ...ring(r2, h)],
+    faces: [bottomFace, Array.from({ length: n }, (_, i) => n + i), ...Array.from({ length: n }, (_, i) => [i, (i + 1) % n, n + ((i + 1) % n), n + i])],
+    edges,
+    names: [],
+  };
+}
+
+/** Характерные точки тела: вершины многогранника; центры оснований и вершина конуса; центр шара. */
+export function keyPoints(b: Body): { p: V3; name: string }[] {
+  if (isPolyhedron(b.kind)) {
+    const ph = polyhedron(b);
+    const names = labelsOf(b, ph.names);
+    return ph.verts.map((p, i) => ({ p, name: names[i]! }));
+  }
+  const pos = b.pos as V3;
+  const top = add(pos, [0, 0, b.h]);
+  const marks =
+    b.kind === 'sphere'
+      ? [{ p: pos, name: 'O' }]
+      : b.kind === 'cone'
+        ? [
+            { p: top, name: 'S' },
+            { p: pos, name: 'O' },
+          ]
+        : [
+            { p: pos, name: 'O' },
+            { p: top, name: 'O₁' },
+          ];
+  const names = labelsOf(
+    b,
+    marks.map((m) => m.name),
+  );
+  return marks.map((m, i) => ({ p: m.p, name: names[i]! }));
 }
 
 export { roundDims };
