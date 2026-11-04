@@ -65,6 +65,9 @@ export const axesPropsSchema = z
     yMax: z.number().finite(),
     grid: z.boolean(),
     color: z.string().max(32),
+    /** Подписи осей (физика: «t, с», «v, м/с»); по умолчанию x и y. */
+    xLabel: z.string().max(24).optional(),
+    yLabel: z.string().max(24).optional(),
   })
   .refine((p) => p.xMax > p.xMin && p.yMax > p.yMin, 'Пределы осей: максимум больше минимума');
 
@@ -111,14 +114,15 @@ function AxesShape({ o, ctx }: { o: BoardObject<AxesProps>; ctx: RenderContext }
     els.push(<Line key={`ty${v}`} points={[x0 - 4, y, x0 + 4, y]} stroke={color} strokeWidth={1} strokeScaleEnabled={false} listening={false} />);
     els.push(<Text key={`ly${v}`} x={Math.max(0, x0 - 46)} y={y - 6} width={40} align="right" text={fmtNum(v)} fontSize={11} fill={color} listening={false} />);
   }
+  // Ось x у нижнего края: подписи делений поднимаются над ней — подпись оси ещё выше.
   return (
     <Group>
       <KRect width={p.w} height={p.h} fill={paper(ctx)} opacity={0.94} stroke={gridColor} strokeWidth={1} strokeScaleEnabled={false} listening={false} />
       {els}
       <Arrow points={[0, y0, p.w, y0]} stroke={color} fill={color} strokeWidth={1.5} strokeScaleEnabled={false} pointerLength={8} pointerWidth={6} listening={false} />
       <Arrow points={[x0, p.h, x0, 0]} stroke={color} fill={color} strokeWidth={1.5} strokeScaleEnabled={false} pointerLength={8} pointerWidth={6} listening={false} />
-      <Text x={p.w - 14} y={y0 - 20} text="x" fontSize={15} fontStyle="italic" fontFamily="Times New Roman, serif" fill={color} listening={false} />
-      <Text x={x0 + 8} y={2} text="y" fontSize={15} fontStyle="italic" fontFamily="Times New Roman, serif" fill={color} listening={false} />
+      <Text x={p.w - 164} width={160} align="right" y={y0 - 20 - (y0 + 6 > p.h - 14 ? 14 : 0)} text={p.xLabel || 'x'} fontSize={15} fontStyle="italic" fontFamily="Times New Roman, serif" fill={color} listening={false} />
+      <Text x={x0 + 8} y={2} text={p.yLabel || 'y'} fontSize={15} fontStyle="italic" fontFamily="Times New Roman, serif" fill={color} listening={false} />
       {p.xMin < 0 && p.xMax > 0 && p.yMin < 0 && p.yMax > 0 && <Text x={x0 - 12} y={y0 + 4} text="0" fontSize={11} fill={color} listening={false} />}
     </Group>
   );
@@ -155,6 +159,8 @@ export const axesModule: ObjectModule<AxesProps, ReactNode> = {
     { kind: 'number', key: 'yMin', label: 'y от', step: 1 },
     { kind: 'number', key: 'yMax', label: 'до', step: 1 },
     { kind: 'toggle', key: 'grid', label: 'Сетка' },
+    { kind: 'text', key: 'xLabel', label: 'Подпись x', maxLength: 24 },
+    { kind: 'text', key: 'yLabel', label: 'Подпись y', maxLength: 24 },
     { kind: 'color', key: 'color', label: 'Цвет' },
   ],
   transform: { rotatable: false, resize: 'free' },

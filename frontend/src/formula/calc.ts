@@ -1,4 +1,5 @@
 import { create, all, type MathNode } from 'mathjs';
+import { EN_TO_RU, RU_TO_EN } from './units';
 
 /**
  * Калькулятор на math.js: числа с десятичной запятой, функции школьной
@@ -19,21 +20,6 @@ math.import(
   Object.fromEntries(['import', 'createUnit', 'evaluate', 'parse', 'compile', 'simplify', 'derivative', 'resolve', 'reviver'].map((n) => [n, blocked(n)])),
   { override: true },
 );
-
-/** Русские обозначения единиц → имена math.js. Порядок важен для обратного перевода. */
-const UNITS: [string, string][] = [
-  ['мм', 'mm'], ['см', 'cm'], ['дм', 'dm'], ['км', 'km'], ['м', 'm'],
-  ['мг', 'mg'], ['кг', 'kg'], ['г', 'g'], ['т', 'tonne'],
-  ['мс', 'ms'], ['мин', 'minute'], ['ч', 'h'], ['сут', 'day'], ['с', 's'],
-  ['кН', 'kN'], ['Н', 'N'], ['кДж', 'kJ'], ['МДж', 'MJ'], ['Дж', 'J'], ['кВт', 'kW'], ['МВт', 'MW'], ['Вт', 'W'],
-  ['кПа', 'kPa'], ['МПа', 'MPa'], ['Па', 'Pa'], ['атм', 'atm'], ['бар', 'bar'],
-  ['мА', 'mA'], ['А', 'A'], ['кВ', 'kV'], ['мВ', 'mV'], ['В', 'V'], ['кОм', 'kohm'], ['МОм', 'Mohm'], ['Ом', 'ohm'],
-  ['мКл', 'mC'], ['Кл', 'C'], ['кГц', 'kHz'], ['МГц', 'MHz'], ['Гц', 'Hz'], ['мкФ', 'uF'], ['Ф', 'F'], ['Тл', 'T'], ['Гн', 'H'],
-  ['мл', 'mL'], ['л', 'L'], ['К', 'K'], ['моль', 'mol'], ['эВ', 'eV'], ['кВтч', 'kWh'], ['град', 'deg'], ['рад', 'rad'],
-];
-const RU_TO_EN = new Map(UNITS);
-const EN_TO_RU = new Map(UNITS.map(([ru, en]) => [en, ru]));
-EN_TO_RU.set('minutes', 'мин').set('hour', 'ч').set('kg', 'кг');
 
 /** Школьные имена функций → math.js. */
 const FUNCTIONS: Record<string, string> = { tg: 'tan', ctg: 'cot', arctg: 'atan', arcctg: 'acot', lg: 'log10', ln: 'log' };

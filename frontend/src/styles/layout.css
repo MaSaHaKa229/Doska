@@ -1313,3 +1313,14 @@ fieldset.stereo-panel {
 .stereo-view[data-mode]:not([data-mode='rotate']) {
   cursor: crosshair;
 }
+/* Диалог «Дано / Найти / Решение» (этап 7.1b) */
+fieldset.given-editor {
+  border: none;
+  margin: 0;
+  padding: 0;
+  min-width: 0;
+}
+.given-editor__title {
+  font-weight: 600;
+  margin: 10px 0 6px;
+}

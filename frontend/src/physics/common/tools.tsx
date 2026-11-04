@@ -5,6 +5,8 @@ import { requestObjectEditor } from '../../tools/formula-tools';
 import { CELL, QUANTITY_INFO, type Quantity } from './quantities';
 import { AXES_TYPE, SCALE_EDITOR, SCALE_TYPE, axesAngleDeg, physAxesModule, type PhysAxesProps, type ScaleProps } from './axes';
 import { BODY_KIND_TITLES, BODY_TYPE, SUPPORT_TITLES, SUPPORT_TYPE, physBodyModule, supportModule, type BodyProps, type PhysBodyKind, type SupportKind, type SupportProps } from './bodies';
+import { GIVEN_EDITOR } from './given';
+import { GRAPH_EDITOR } from './graph';
 import { PLUGIN_ID, SUM_TYPE, VECTOR_TYPE, sumModule, vectorModule, type SumProps, type VectorProps } from './vectors';
 
 const section = PLUGIN_ID;
@@ -271,6 +273,23 @@ const scaleTool: ToolModule<ReactNode> = {
   },
 };
 
+function editorTool(id: string, title: string, icon: string, editor: string, keywords: string[]): ToolModule<ReactNode> {
+  return {
+    id: `${PLUGIN_ID}.${id}`,
+    title,
+    icon,
+    group: 'physics',
+    section,
+    keywords,
+    requiresWrite: true,
+    cursor: 'copy',
+    onPointerDown(e, ctx) {
+      ctx.activateTool('core.select');
+      requestObjectEditor({ editor, id: null, at: e.world });
+    },
+  };
+}
+
 export const commonTools: ToolModule<ReactNode>[] = [
   vectorTool('force', 'MoveUpRight'),
   vectorTool('velocity', 'MoveRight'),
@@ -288,4 +307,6 @@ export const commonTools: ToolModule<ReactNode>[] = [
   supportTool('mount', 'Anchor', ['подвес', 'крепление', 'потолок', 'нить']),
   axesTool,
   scaleTool,
+  editorTool('given', 'Дано / Найти / Решение', 'ClipboardList', GIVEN_EDITOR, ['дано', 'найти', 'решение', 'оформление задачи', 'си', 'перевод в си', 'размерность']),
+  editorTool('graph', 'График зависимости', 'ChartSpline', GRAPH_EDITOR, ['график зависимости', 'график скорости', 'v(t)', 'x(t)', 'p(v)', 'изотерма']),
 ];

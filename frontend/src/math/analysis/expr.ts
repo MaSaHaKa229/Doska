@@ -30,6 +30,9 @@ export function loadMath(): Promise<void> {
 
 export const mathReady = () => !!math;
 
+/** Загруженный math.js (для других разделов: единицы физики) или null до загрузки. */
+export const getMath = (): MathJsInstance | null => math;
+
 /** Перерисовка компонента, когда math.js загрузится. */
 export function useMathReady(): boolean {
   const [ready, setReady] = useState(mathReady());

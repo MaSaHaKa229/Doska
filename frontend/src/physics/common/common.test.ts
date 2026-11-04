@@ -97,9 +97,13 @@ describe('величины', () => {
 });
 
 describe('плагин physics.common', () => {
-  it('зарегистрирован: 6 типов объектов, 16 инструментов в подразделе', () => {
+  it('зарегистрирован: 7 типов объектов, 18 инструментов в подразделе, постоянные в Ctrl+K', () => {
     for (const t of [VECTOR_TYPE, SUM_TYPE, BODY_TYPE, SUPPORT_TYPE, AXES_TYPE, SCALE_TYPE]) expect(registry.getObjectModule(t)).toBeTruthy();
-    expect(registry.listTools().filter((t) => t.id.startsWith('physics.common.'))).toHaveLength(16);
+    expect(registry.listTools().filter((t) => t.id.startsWith('physics.common.'))).toHaveLength(18);
+    expect(registry.getObjectModule('physics.common.given')).toBeTruthy();
+    const g = registry.search('ускорение свободного падения').find((r) => r.id === 'physics.common.const.g');
+    expect(g).toBeTruthy();
+    expect(registry.getCommand('physics.common.const.g')!.action).toEqual({ kind: 'insert', objectType: 'core.formula', props: { latex: 'g = 9{,}8\\ \\text{м/с}^2', size: 28, color: 'ink' } });
     expect(registry.search('сила трения').some((r) => r.title.includes('сила'))).toBe(true);
   });
 });

@@ -20,6 +20,9 @@ export type AxesProps = {
   yMax: number;
   grid: boolean;
   color: string;
+  /** Подписи осей (физика, 7.1b: «t, с»); по умолчанию x и y. */
+  xLabel?: string;
+  yLabel?: string;
 };
 
 /** Кадр системы координат: перевод «математика ↔ доска». */
