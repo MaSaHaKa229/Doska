@@ -7,7 +7,7 @@ import { fmt } from '../common/quantities';
 import { PLAY0, playAction, playSchema, usePlayTime } from '../mechanics/playback';
 import { playText } from '../mechanics/objects';
 import { Info, PLAY_ONLY, boxed, num, useZoom } from '../waves/objects';
-import { Plot, type PlotPoint, niceMax, valueText } from './plot';
+import { Plot, type PlotPoint, niceMax, valueText } from '../common/plot';
 import { GASES, PROCESS_TITLE, R, type PV, type ProcessKind, type Segment, bounce, carnotCycle, cycleInfo, gasState, processInfo, rectCycle, sci, seeded, triangleCycle } from './thermo';
 
 export const PLUGIN_ID = 'physics.thermo';

@@ -1,6 +1,8 @@
 import { Arrow, Circle, Group, Line, Shape, Text } from 'react-konva';
-import { fmt } from '../common/quantities';
-import { useZoom } from '../waves/objects';
+import { useBoard } from '../../store/board';
+import { fmt } from './quantities';
+
+const useZoom = () => useBoard((s) => (s.pageId && s.cameras[s.pageId]?.zoom) || 1);
 
 const raw = (c: unknown) => (c as { _context: CanvasRenderingContext2D })._context;
 const italic = { fontStyle: 'italic', fontFamily: 'Times New Roman, serif' } as const;
@@ -45,7 +47,7 @@ export interface PlotProps {
   origin?: boolean;
 }
 
-/** Диаграмма состояний и графики t(τ): оси от min до max, параметрические кривые. */
+/** Диаграмма по точкам (параметрические кривые): оси от min до max, закраски, отмеченные точки с проекциями. */
 export function Plot({ x, y, w, h, xMin = 0, xMax, yMin = 0, yMax, curves, fills = [], points = [], xLabel, yLabel, ink, origin = true }: PlotProps) {
   const zoom = useZoom();
   const X = (v: number) => ((v - xMin) / (xMax - xMin || 1)) * w;

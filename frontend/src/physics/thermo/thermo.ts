@@ -3,6 +3,8 @@
  * школьным формулам. Единицы СИ, если не сказано иное.
  */
 
+export { sci, seeded } from '../common/quantities';
+
 /** Универсальная газовая постоянная, Дж/(моль·К); постоянная Больцмана, Дж/К. */
 export const R = 8.31;
 export const K_B = 1.38e-23;
@@ -365,44 +367,9 @@ export function heatingAt(stages: Stage[], tau: number): HeatingPoint {
 //  Движение молекул на рисунке
 // =====================================================================
 
-/** Псевдослучайные числа от номера молекулы — одинаковые у всех участников. */
-export function seeded(seed: number): () => number {
-  let a = (seed * 2654435761) >>> 0;
-  return () => {
-    a = (a + 0x6d2b79f5) >>> 0;
-    let t = a;
-    t = Math.imul(t ^ (t >>> 15), t | 1);
-    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-}
-
 /** Координата при упругих отражениях от стенок 0 и w: «пила» с отражением. */
 export function bounce(u: number, w: number): number {
   if (w <= 0) return 0;
   const m = ((u % (2 * w)) + 2 * w) % (2 * w);
   return m <= w ? m : 2 * w - m;
-}
-
-// =====================================================================
-//  Запись чисел
-// =====================================================================
-
-const SUP: Record<string, string> = { '0': '⁰', '1': '¹', '2': '²', '3': '³', '4': '⁴', '5': '⁵', '6': '⁶', '7': '⁷', '8': '⁸', '9': '⁹', '-': '⁻' };
-
-/** «6,21·10⁻²¹» для очень больших и малых чисел, иначе «1,25» (digits значащих цифр). */
-export function sci(v: number, digits = 3): string {
-  if (!Number.isFinite(v)) return '—';
-  if (v === 0) return '0';
-  const a = Math.abs(v);
-  const ru = (s: string) => s.replace('.', ',').replace('-', '−');
-  if (a >= 0.01 && a < 1e5) return ru(String(Number(v.toPrecision(digits))));
-  const e = Math.floor(Math.log10(a));
-  let m = Number((v / 10 ** e).toPrecision(digits));
-  let ee = e;
-  if (Math.abs(m) >= 10) {
-    m /= 10;
-    ee += 1;
-  }
-  return `${ru(String(m))}·10${String(ee).split('').map((ch) => SUP[ch]).join('')}`;
 }
