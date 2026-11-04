@@ -90,11 +90,11 @@ describe('фотон и де Бройль', () => {
     expect(sup(-14)).toBe('⁻¹⁴');
   });
 
-  it('отметка шкалы тянется в пределах [10⁻¹⁴, 10⁴] м; 4 инструмента раздела', () => {
+  it('отметка шкалы тянется в пределах [10⁻¹⁴, 10⁴] м; 9 инструментов раздела', () => {
     const o = { x: 0, y: 0, rotation: 0, scaleX: 1, scaleY: 1, props: spectrumModule.createProps() } as unknown as BoardObject<SpectrumProps>;
     const mods = { shift: false, alt: false, ctrl: false };
     expect(spectrumModule.dragHandle!(o, 'lg', { x: 9999, y: 0 }, mods, {} as never)).toEqual({ props: { lg: 4 } });
     expect(spectrumModule.dragHandle!(o, 'lg', { x: 320, y: 0 }, mods, {} as never)).toEqual({ props: { lg: -5 } });
-    expect(registry.listTools().filter((t) => t.id.startsWith('physics.modern.'))).toHaveLength(4);
+    expect(registry.listTools().filter((t) => t.id.startsWith('physics.modern.'))).toHaveLength(9);
   });
 });
