@@ -18,7 +18,7 @@ export const OSC_TYPE = `${PLUGIN_ID}.oscillator`;
 export const BEATS_TYPE = `${PLUGIN_ID}.beats`;
 export const LC_TYPE = `${PLUGIN_ID}.lc`;
 
-const useZoom = () => useBoard((s) => (s.pageId && s.cameras[s.pageId]?.zoom) || 1);
+export const useZoom = () => useBoard((s) => (s.pageId && s.cameras[s.pageId]?.zoom) || 1);
 const raw = (c: unknown) => (c as { _context: CanvasRenderingContext2D })._context;
 const italic = { fontStyle: 'italic', fontFamily: 'Times New Roman, serif' } as const;
 const INFO = 14;
@@ -27,14 +27,14 @@ const VEL = '#2563eb';
 const C1 = '#2563eb';
 const C2 = '#16a34a';
 const C3 = '#d13a3a';
-const PLAY_ONLY = PLAY_FIELDS.filter((f) => f.key !== 'graphs');
-const num = (key: string, label: string, min: number, max: number, step: number, slider = false) => ({ kind: 'number' as const, key, label, min, max, step, ...(slider ? { slider } : {}) });
+export const PLAY_ONLY = PLAY_FIELDS.filter((f) => f.key !== 'graphs');
+export const num = (key: string, label: string, min: number, max: number, step: number, slider = false) => ({ kind: 'number' as const, key, label, min, max, step, ...(slider ? { slider } : {}) });
 
 // =====================================================================
 //  Общие части
 // =====================================================================
 
-function Info({ x, y, lines, ink, muted }: { x: number; y: number; lines: string[]; ink: string; muted: string }) {
+export function Info({ x, y, lines, ink, muted }: { x: number; y: number; lines: string[]; ink: string; muted: string }) {
   return (
     <Group listening={false}>
       {lines.map((l, i) => (
@@ -118,7 +118,7 @@ function Bars({ x, y, h, items, max, ink }: { x: number; y: number; h: number; i
 }
 
 /** Модуль с прямоугольной областью: габарит и попадание. */
-function boxed<P>(box: (p: P) => Rect) {
+export function boxed<P>(box: (p: P) => Rect) {
   return {
     serialize: (o: BoardObject<P>) => o as unknown as BoardObject<Record<string, never>>,
     getLocalBounds: (o: BoardObject<P>) => box(o.props),

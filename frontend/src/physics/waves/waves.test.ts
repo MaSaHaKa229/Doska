@@ -45,7 +45,7 @@ describe('колебания', () => {
     expect(c.wl(c.T / 4)).toBeCloseTo(c.W, 15);
   });
 
-  it('плагин: 4 инструмента колебаний', () => {
-    expect(registry.listTools().filter((t) => t.id.startsWith('physics.waves.'))).toHaveLength(4);
+  it('плагин: инструменты колебаний на месте', () => {
+    for (const t of ['pendulum', 'oscillator', 'beats', 'lc']) expect(registry.getTool(`physics.waves.${t}`)).toBeTruthy();
   });
 });
