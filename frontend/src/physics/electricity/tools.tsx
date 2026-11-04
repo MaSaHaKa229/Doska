@@ -1,7 +1,11 @@
 import type { ReactNode } from 'react';
-import type { BoardObject, ToolModule } from '@doska/shared';
+import { Line } from 'react-konva';
+import type { BoardObject, Point, ToolModule, ToolPointerEvent } from '@doska/shared';
 import { toLocal } from '../../objects/util';
 import { toast } from '../../store/toast';
+import { CELL_PX } from './field';
+import type { PartKind } from './circuit';
+import { CIRCUIT_TYPE, MAX_PARTS, PART_TITLES, circuitBox, circuitModule, newPart, nextPartId, type CircuitProps } from './circuits';
 import { CAPACITOR_TYPE, MAX_CHARGES, PLUGIN_ID, SYSTEM_TYPE, capacitorModule, nextChargeId, systemModule, type CapacitorProps, type SystemProps } from './objects';
 
 const section = PLUGIN_ID;
@@ -41,6 +45,95 @@ function chargeTool(sign: 1 | -1): ToolModule<ReactNode> {
   };
 }
 
+// =====================================================================
+//  Цепи: элемент протяжкой по узлам сетки
+// =====================================================================
+
+/** Узел сетки (мировые координаты), ближайший к точке. */
+const snapNode = (p: Point): Point => ({ x: Math.round(p.x / CELL_PX) * CELL_PX, y: Math.round(p.y / CELL_PX) * CELL_PX });
+
+interface Wiring {
+  a: Point;
+  b: Point;
+}
+
+/** Конец элемента — по горизонтали или вертикали от начала (по большему смещению). */
+function endOf(a: Point, e: ToolPointerEvent): Point {
+  const q = snapNode(e.world);
+  return Math.abs(q.x - a.x) >= Math.abs(q.y - a.y) ? { x: q.x, y: a.y } : { x: a.x, y: q.y };
+}
+
+const PART_ICONS: Record<PartKind, string> = { wire: 'Spline', battery: 'BatteryFull', resistor: 'RectangleHorizontal', rheostat: 'SlidersHorizontal', lamp: 'Lightbulb', switch: 'ToggleLeft', ammeter: 'Gauge', voltmeter: 'Activity' };
+const PART_KEYWORDS: Record<PartKind, string[]> = {
+  wire: ['провод', 'соединение'],
+  battery: ['источник тока', 'батарея', 'эдс', 'гальванический элемент', 'внутреннее сопротивление'],
+  resistor: ['резистор', 'сопротивление', 'закон ома'],
+  rheostat: ['реостат', 'переменное сопротивление'],
+  lamp: ['лампа', 'лампочка', 'мощность тока'],
+  switch: ['ключ', 'выключатель'],
+  ammeter: ['амперметр', 'сила тока'],
+  voltmeter: ['вольтметр', 'напряжение'],
+};
+
+function partTool(kind: PartKind): ToolModule<ReactNode> {
+  return {
+    id: `${PLUGIN_ID}.${kind}`,
+    title: PART_TITLES[kind],
+    icon: PART_ICONS[kind],
+    group: 'physics',
+    section: `${PLUGIN_ID}.circuits`,
+    keywords: [...PART_KEYWORDS[kind], 'электрическая цепь', 'схема', 'постоянный ток'],
+    requiresWrite: true,
+    cursor: 'crosshair',
+    onPointerDown(e, ctx) {
+      const a = snapNode(e.world);
+      ctx.setPreview({ a, b: a } satisfies Wiring);
+    },
+    onPointerMove(e, ctx) {
+      const w = ctx.getPreview<Wiring>();
+      if (w) ctx.setPreview({ ...w, b: endOf(w.a, e) } satisfies Wiring);
+    },
+    onPointerUp(e, ctx) {
+      const w = ctx.getPreview<Wiring>();
+      ctx.setPreview(null);
+      if (!w) return;
+      let b = endOf(w.a, e);
+      // Щелчок без протяжки — элемент длиной 3 клетки вправо.
+      if (b.x === w.a.x && b.y === w.a.y) b = { x: w.a.x + 3 * CELL_PX, y: w.a.y };
+      // Схема, в чьей области начат элемент, — иначе новая (начало координат — в узле сетки).
+      const host = (ctx.listObjects(CIRCUIT_TYPE) as BoardObject<CircuitProps>[]).find((o) => {
+        const bx = circuitBox(o.props);
+        const q = toLocal(o, w.a);
+        return q.x >= bx.x && q.y >= bx.y && q.x <= bx.x + bx.width && q.y <= bx.y + bx.height;
+      });
+      const origin = host ? { x: host.x, y: host.y } : w.a;
+      const cellOf = (p: Point): [number, number] => [Math.round((p.x - origin.x) / CELL_PX), Math.round((p.y - origin.y) / CELL_PX)];
+      if (host) {
+        if (host.props.parts.length >= MAX_PARTS) {
+          toast.info(`В схеме не больше ${MAX_PARTS} элементов`);
+          return;
+        }
+        ctx.updateObject<CircuitProps>(host.id, { props: { parts: [...host.props.parts, newPart(kind, nextPartId(host.props.parts), cellOf(w.a), cellOf(b))] } });
+        ctx.setSelection([host.id]);
+        return;
+      }
+      const props: CircuitProps = { ...circuitModule.createProps(), parts: [newPart(kind, 'e1', [0, 0], cellOf(b))] };
+      const id = ctx.createObject<CircuitProps>(CIRCUIT_TYPE, { x: origin.x, y: origin.y, props });
+      if (id) ctx.setSelection([id]);
+    },
+    onKeyDown(key, _m, ctx) {
+      if (key !== 'Escape' || !ctx.getPreview<Wiring>()) return false;
+      ctx.setPreview(null);
+      return true;
+    },
+    renderOverlay(ctx) {
+      const w = ctx.getPreview<Wiring>();
+      if (!w) return null;
+      return <Line points={[w.a.x, w.a.y, w.b.x, w.b.y]} stroke="#2a7de1" strokeWidth={2} dash={[6, 4]} strokeScaleEnabled={false} listening={false} />;
+    },
+  };
+}
+
 export const electricityTools: ToolModule<ReactNode>[] = [
   chargeTool(1),
   chargeTool(-1),
@@ -59,4 +152,5 @@ export const electricityTools: ToolModule<ReactNode>[] = [
       if (id) ctx.setSelection([id]);
     },
   },
+  ...(['wire', 'battery', 'resistor', 'rheostat', 'lamp', 'switch', 'ammeter', 'voltmeter'] as const).map(partTool),
 ];
