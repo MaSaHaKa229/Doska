@@ -12,28 +12,28 @@ export const SURFACE_TYPE = `${PLUGIN_ID}.surface`;
 export const CONTOURS_TYPE = `${PLUGIN_ID}.contours`;
 export const FIELD_TYPE = `${PLUGIN_ID}.field`;
 
-const useZoom = () => useBoard((s) => (s.pageId && s.cameras[s.pageId]?.zoom) || 1);
+export const useZoom = () => useBoard((s) => (s.pageId && s.cameras[s.pageId]?.zoom) || 1);
 const raw = (c: unknown) => (c as { _context: CanvasRenderingContext2D })._context;
 const italic = { fontStyle: 'italic', fontFamily: 'Times New Roman, serif' } as const;
 const GRAD = '#d13a3a';
 const LINE = '#2563eb';
 const INFO = 14;
 
-const rangeSchema = {
+export const rangeSchema = {
   xMin: z.number().finite().min(-1e6).max(1e6),
   xMax: z.number().finite().min(-1e6).max(1e6),
   yMin: z.number().finite().min(-1e6).max(1e6),
   yMax: z.number().finite().min(-1e6).max(1e6),
 };
-const RANGE_FIELDS = [
+export const RANGE_FIELDS = [
   { kind: 'number' as const, key: 'xMin', label: 'x от', min: -1e6, max: 1e6, step: 1 },
   { kind: 'number' as const, key: 'xMax', label: 'x до', min: -1e6, max: 1e6, step: 1 },
   { kind: 'number' as const, key: 'yMin', label: 'y от', min: -1e6, max: 1e6, step: 1 },
   { kind: 'number' as const, key: 'yMax', label: 'y до', min: -1e6, max: 1e6, step: 1 },
 ];
-const badRange = (r: Range2) => !(r.xMax > r.xMin && r.yMax > r.yMin);
+export const badRange = (r: Range2) => !(r.xMax > r.xMin && r.yMax > r.yMin);
 
-function Lines({ x, y, lines, ink, muted }: { x: number; y: number; lines: string[]; ink: string; muted: string }) {
+export function Lines({ x, y, lines, ink, muted }: { x: number; y: number; lines: string[]; ink: string; muted: string }) {
   return (
     <Group listening={false}>
       {lines.map((l, i) => (
@@ -44,7 +44,7 @@ function Lines({ x, y, lines, ink, muted }: { x: number; y: number; lines: strin
 }
 
 /** Модуль с прямоугольной областью: габарит и попадание. */
-function boxed<P>(box: (p: P) => Rect) {
+export function boxed<P>(box: (p: P) => Rect) {
   return {
     serialize: (o: BoardObject<P>) => o as unknown as BoardObject<Record<string, never>>,
     getLocalBounds: (o: BoardObject<P>) => box(o.props),
@@ -58,7 +58,7 @@ function boxed<P>(box: (p: P) => Rect) {
 }
 
 /** Разбор нескольких записей сразу: функции или первая ошибка. */
-function useCompiled(srcs: string[]): Compiled[] | { error: string } | null {
+export function useCompiled(srcs: string[]): Compiled[] | { error: string } | null {
   const ready = useMathReady();
   return useMemo(() => {
     if (!ready) return null;
@@ -73,7 +73,7 @@ function useCompiled(srcs: string[]): Compiled[] | { error: string } | null {
   }, [ready, ...srcs]);
 }
 
-function Status({ state, ink }: { state: { error: string } | null; ink: string }) {
+export function Status({ state, ink }: { state: { error: string } | null; ink: string }) {
   return <Text x={0} y={0} text={state ? `Ошибка: ${state.error}` : 'Загрузка вычислений…'} fontSize={15} fill={state ? GRAD : ink} listening={false} />;
 }
 
@@ -81,23 +81,23 @@ function Status({ state, ink }: { state: { error: string } | null; ink: string }
 //  Плоская картинка: координатная область W × H
 // =====================================================================
 
-const PW = 380;
-const PH = 380;
+export const PW = 380;
+export const PH = 380;
 
-interface Map2 {
+export interface Map2 {
   X: (x: number) => number;
   Y: (y: number) => number;
   inv: (px: number, py: number) => { x: number; y: number };
 }
 
-const map2 = (r: Range2): Map2 => ({
+export const map2 = (r: Range2): Map2 => ({
   X: (x) => ((x - r.xMin) / (r.xMax - r.xMin)) * PW,
   Y: (y) => PH - ((y - r.yMin) / (r.yMax - r.yMin)) * PH,
   inv: (px, py) => ({ x: r.xMin + (px / PW) * (r.xMax - r.xMin), y: r.yMin + ((PH - py) / PH) * (r.yMax - r.yMin) }),
 });
 
 /** Сетка, оси через ноль и подписи делений. */
-function PlaneFrame({ r, ink, muted }: { r: Range2; ink: string; muted: string }) {
+export function PlaneFrame({ r, ink, muted, xLabel = 'x', yLabel = 'y' }: { r: Range2; ink: string; muted: string; xLabel?: string; yLabel?: string }) {
   const zoom = useZoom();
   const m = map2(r);
   const sx = niceStep(((r.xMax - r.xMin) / PW) * 40);
@@ -125,14 +125,14 @@ function PlaneFrame({ r, ink, muted }: { r: Range2; ink: string; muted: string }
       ))}
       <Arrow points={[0, ax, PW + 14, ax]} stroke={ink} fill={ink} strokeWidth={1.2} strokeScaleEnabled={false} pointerLength={8 / zoom} pointerWidth={6 / zoom} listening={false} />
       <Arrow points={[ay, PH, ay, -14]} stroke={ink} fill={ink} strokeWidth={1.2} strokeScaleEnabled={false} pointerLength={8 / zoom} pointerWidth={6 / zoom} listening={false} />
-      <Text x={PW + 6} y={ax + 4} text="x" fontSize={15} {...italic} fill={ink} listening={false} />
-      <Text x={ay + 7} y={-18} text="y" fontSize={15} {...italic} fill={ink} listening={false} />
+      <Text x={PW + 6} y={ax + 4} text={xLabel} fontSize={15} {...italic} fill={ink} listening={false} />
+      <Text x={ay + 7} y={-18} text={yLabel} fontSize={15} {...italic} fill={ink} listening={false} />
     </Group>
   );
 }
 
 /** Точка M в координатах функции — ручка «point» без привязки к сетке. */
-function pointHandle(o: BoardObject<Range2 & { x0: number; y0: number }>, label: string) {
+export function pointHandle(o: BoardObject<Range2 & { x0: number; y0: number }>, label: string) {
   const m = map2(o.props);
   return { id: 'M', kind: 'point' as const, position: toWorld(o, { x: m.X(o.props.x0), y: m.Y(o.props.y0) }), label, snap: false };
 }
