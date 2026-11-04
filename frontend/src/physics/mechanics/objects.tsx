@@ -113,10 +113,10 @@ function boxOf(x0: number, x1: number, y0: number, y1: number, scale: number): R
 }
 
 // «⏸» в шрифте холста часто нет — пауза обозначается «‖».
-const playText = (p: Play) => (p.running ? '▶' : '‖');
+export const playText = (p: Play) => (p.running ? '▶' : '‖');
 
 /** Кнопки панели свойств: пуск, сначала, графики. */
-const PLAY_FIELDS = [
+export const PLAY_FIELDS = [
   { kind: 'action', key: 'toggle', label: '▶ Пуск / пауза' },
   { kind: 'action', key: 'reset', label: '⟲ Сначала' },
   { kind: 'action', key: 'graphs', label: 'Графики' },
@@ -124,21 +124,21 @@ const PLAY_FIELDS = [
 ] as const;
 
 /** Графики — справа от чертежа, друг под другом, одним шагом отмены (действие уже в транзакции). */
-function placeGraphs(o: BoardObject, box: Rect, list: GraphInput[], ctx: ActionContext): void {
-  const math = getMath();
-  if (!math) {
-    void loadMath();
-    toast.info('Загружаются вычисления — нажмите «Графики» ещё раз');
-    return;
-  }
-  list.forEach((g, i) => {
-    const plan = planGraph(math, g);
-    if ('error' in plan) {
-      toast.info(plan.error);
-      return;
-    }
-    insertGraph(ctx, plan, { x: o.x + box.x + box.width + 250, y: o.y + box.y + 150 + i * 360 });
-  });
+export function placeGraphs(o: BoardObject, box: Rect, list: GraphInput[], ctx: ActionContext): void {
+  const run = () => {
+    const math = getMath()!;
+    list.forEach((g, i) => {
+      const plan = planGraph(math, g);
+      if ('error' in plan) {
+        toast.info(plan.error);
+        return;
+      }
+      insertGraph(ctx, plan, { x: o.x + box.x + box.width + 250, y: o.y + box.y + 150 + i * 360 });
+    });
+  };
+  if (getMath()) run();
+  // math.js ещё не загружен (у объекта нет записей): графики появятся сразу после загрузки — тоже одним шагом.
+  else void loadMath().then(() => ctx.transact(run));
 }
 
 // =====================================================================

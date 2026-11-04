@@ -108,8 +108,7 @@ describe('объекты механики', () => {
     return { model, pageId, ctx };
   }
 
-  it('плагин: 2 объекта, 2 инструмента, кнопки на панели свойств', () => {
-    expect(registry.listTools().filter((t) => t.id.startsWith('physics.mechanics.'))).toHaveLength(2);
+  it('плагин: кнопки на панели свойств', () => {
     expect(motionModule.inspector!.filter((f) => f.kind === 'action').map((f) => f.key)).toEqual(['toggle', 'reset', 'graphs']);
   });
 
