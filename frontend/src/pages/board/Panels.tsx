@@ -38,6 +38,7 @@ import { ConfirmDialog } from '../../ui/ConfirmDialog';
 import { Checkbox, SelectField, TextField } from '../../ui/Field';
 import { ActionMenu } from '../../ui/Menu';
 import { InspectorFieldView } from './InspectorFields';
+import { makeEditorContext } from './PluginEditors';
 import { CropDialog } from './MediaUi';
 import { recognizeSelection } from './recognize';
 import { useOcrEnabled } from './useOcrEnabled';
@@ -205,6 +206,18 @@ export function PropertiesBar({ model, commands, theme }: { model: BoardModel; c
   // Объект с редактором «обрезка» (картинка) — кнопка «Обрезать».
   const cropTarget = leaves.length === 1 && entries[0]?.module?.editor === 'crop' ? leaves[0]! : null;
 
+  // Кнопка действия (ObjectModule.runAction) — для всех выделенных объектов одним шагом отмены.
+  const runAction = (key: string) => {
+    if (!pageId) return;
+    const ctx = { ...makeEditorContext(model, pageId), now: Date.now() };
+    model.transact(() => {
+      for (const id of leaves) {
+        const e = model.get(id);
+        if (e?.module?.runAction && model.canModify(id, 'props')) e.module.runAction(e.obj, key, ctx);
+      }
+    });
+  };
+
   if (selection.length === 0 && tool?.options?.length) {
     return (
       <div className="board-props" aria-label="Параметры инструмента">
@@ -238,7 +251,7 @@ export function PropertiesBar({ model, commands, theme }: { model: BoardModel; c
           theme={theme}
           disabled={!canEdit}
           value={commonValue(entries.map((e) => (e.obj.props as Record<string, unknown>)[f.key]))}
-          onChange={(v) => model.updateObjects(leaves.map((id) => ({ id, patch: { props: { [f.key]: v } } })))}
+          onChange={(v) => (f.kind === 'action' ? runAction(f.key) : model.updateObjects(leaves.map((id) => ({ id, patch: { props: { [f.key]: v } } }))))}
         />
       ))}
       {cropTarget && (

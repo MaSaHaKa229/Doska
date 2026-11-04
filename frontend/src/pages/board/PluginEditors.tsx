@@ -15,6 +15,36 @@ function pluginEditor(name: string): ComponentType<PluginEditorProps> | null {
   return null;
 }
 
+/**
+ * API записи на странице для редакторов плагинов и кнопок действий панели
+ * свойств (ObjectModule.runAction): как у инструмента, без указателя.
+ */
+export function makeEditorContext(model: BoardModel, pageId: string): EditorContext {
+  const st = () => useBoard.getState();
+  return {
+    get userId() {
+      return model.userId;
+    },
+    pageId,
+    get canWrite() {
+      return !!st().caps?.write;
+    },
+    resolve: model.resolve,
+    createObject: (type, init) => model.createObject(type, { ...init, pageId }) ?? '',
+    updateObject: (id, patch) => void model.updateObjects([{ id, patch }]),
+    deleteObjects: (ids) => void model.deleteObjects(ids),
+    transact: (fn, opts) => model.transact(fn, opts),
+    canModify: (id) => model.canModify(id, 'props'),
+    listObjects: (type) =>
+      model
+        .pageObjects(pageId)
+        .map((id) => model.getObject(id))
+        .filter((o): o is BoardObject => !!o && (!type || o.type === type)),
+    setSelection: (ids) => st().setSelection(ids),
+    getToolOptions: <T,>() => st().toolOptions as T,
+  };
+}
+
 /** Редактор открывается и без права изменения — для просмотра (BoardPlugin.viewers). */
 const isViewer = (name: string) => registry.listPlugins().some((p) => p.viewers?.includes(name));
 
@@ -44,29 +74,7 @@ export function PluginEditorsHost({ model }: { model: BoardModel }) {
 
   const ctx = useMemo<EditorContext | null>(() => {
     if (!pageId) return null;
-    const st = () => useBoard.getState();
-    return {
-      get userId() {
-        return model.userId;
-      },
-      pageId,
-      get canWrite() {
-        return !!st().caps?.write;
-      },
-      resolve: model.resolve,
-      createObject: (type, init) => model.createObject(type, { ...init, pageId }) ?? '',
-      updateObject: (id, patch) => void model.updateObjects([{ id, patch }]),
-      deleteObjects: (ids) => void model.deleteObjects(ids),
-      transact: (fn, opts) => model.transact(fn, opts),
-      canModify: (id) => model.canModify(id, 'props'),
-      listObjects: (type) =>
-        model
-          .pageObjects(pageId)
-          .map((id) => model.getObject(id))
-          .filter((o): o is BoardObject => !!o && (!type || o.type === type)),
-      setSelection: (ids) => st().setSelection(ids),
-      getToolOptions: <T,>() => st().toolOptions as T,
-    };
+    return makeEditorContext(model, pageId);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [model, pageId, caps]);
 

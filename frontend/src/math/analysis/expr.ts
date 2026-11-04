@@ -30,6 +30,20 @@ export function loadMath(): Promise<void> {
 
 export const mathReady = () => !!math;
 
+/**
+ * Символьная производная записи по переменной (физика: v(t) по закону x(t)).
+ * Запись — для math.js (точка в дробях); null — math.js не загружен или запись неверна.
+ */
+export function differentiate(src: string, variable: string): string | null {
+  if (!math || !derivative) return null;
+  try {
+    // derivative math.js упрощает результат сам (simplify в этом экземпляре закрыт для записей).
+    return derivative(math.parse(src), variable).toString({ implicit: 'hide' });
+  } catch {
+    return null;
+  }
+}
+
 /** Загруженный math.js (для других разделов: единицы физики) или null до загрузки. */
 export const getMath = (): MathJsInstance | null => math;
 

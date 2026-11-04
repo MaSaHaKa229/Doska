@@ -135,6 +135,12 @@ export function InspectorFieldView({
           {field.slider && <span className="small mono">{typeof value === 'number' ? value : '—'}</span>}
         </label>
       );
+    case 'action':
+      return (
+        <button type="button" className="btn btn--small" disabled={disabled} onClick={() => onChange(true)}>
+          {field.label}
+        </button>
+      );
     case 'text':
     case 'latex':
       return (

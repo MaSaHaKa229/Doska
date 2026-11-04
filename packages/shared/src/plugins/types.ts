@@ -121,7 +121,13 @@ export type InspectorField =
       slider?: boolean;
     }
   | { kind: 'toggle'; key: string; label: string }
-  | { kind: 'select'; key: string; label: string; options: { value: string; label: string }[] };
+  | { kind: 'select'; key: string; label: string; options: { value: string; label: string }[] }
+  /**
+   * Кнопка действия (этап 7.2a): «Пуск», «Сначала», «Графики». Нажатие
+   * вызывает ObjectModule.runAction(obj, key, ctx) для каждого выделенного
+   * объекта этого типа — одним шагом отмены.
+   */
+  | { kind: 'action'; key: string; label: string };
 
 // ---------------------------------------------------------------------
 //  Модуль объекта
@@ -194,6 +200,12 @@ export interface ObjectModule<P = Record<string, JsonValue>, R = unknown> {
 
   /** Поля контекстной панели свойств. */
   inspector?: InspectorField[];
+  /**
+   * Действие кнопки панели свойств (поле kind: 'action'): изменения через
+   * API записи (ctx.updateObject, ctx.createObject). ctx.now — время нажатия
+   * (Date.now()), например для общего у всех участников воспроизведения.
+   */
+  runAction?(obj: BoardObject<P>, key: string, ctx: ActionContext): void;
   /** Поведение рамки трансформации. */
   transform?: {
     rotatable: boolean;
@@ -423,6 +435,9 @@ export type EditorContext = Pick<
   ToolContext,
   'userId' | 'pageId' | 'canWrite' | 'resolve' | 'createObject' | 'updateObject' | 'deleteObjects' | 'transact' | 'canModify' | 'listObjects' | 'setSelection' | 'getToolOptions'
 >;
+
+/** API действия кнопки панели свойств (ObjectModule.runAction). */
+export type ActionContext = EditorContext & { now: number };
 
 /** Свойства редактора плагина. objectId null — создать новый объект (в точке at). */
 export interface PluginEditorProps {
