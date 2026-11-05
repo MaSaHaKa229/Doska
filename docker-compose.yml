@@ -1,13 +1,101 @@
-# Docker Compose учебной доски.
-# Сейчас здесь только необязательный сервис распознавания рукописных формул
-# (профиль ocr). Остальные сервисы (PostgreSQL, MinIO, бэкенд, Nginx, certbot)
-# добавляются на этапе 9.
+# Docker Compose «Учебной доски»: всё на одном сервере.
 #
-#   docker compose --profile ocr up -d formula-ocr
-#   FORMULA_OCR_URL=http://formula-ocr:8502/predict   (бэкенд в той же сети Compose)
-#   FORMULA_OCR_URL=http://127.0.0.1:8502/predict     (бэкенд запущен на самом сервере)
+#   db           PostgreSQL 16 (данные — том pgdata)
+#   backend      сервер: REST API и совместная работа (WebSocket); при запуске —
+#                миграции, первый администратор и встроенные шаблоны.
+#                Файлы (картинки, PDF) — том uploads.
+#   web          Nginx: собранный сайт, прокси /api и /ws к серверу,
+#                HTTPS (если задан DOMAIN и выпущен сертификат)
+#   certbot      продление сертификата Let's Encrypt (профиль tls)
+#   formula-ocr  распознавание рукописных формул (профиль ocr, необязательно)
+#
+# Настройки — в .env (образец: .env.example). Обычный запуск:
+#   docker compose up -d --build
+# С продлением сертификата:       docker compose --profile tls up -d
+# С распознаванием формул:        docker compose --profile ocr up -d
+# Первый сертификат:              ./deploy/scripts/https.sh
+
+name: doska
 
 services:
+  db:
+    image: postgres:16.10-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-doska}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Задайте POSTGRES_PASSWORD в .env}
+      POSTGRES_DB: ${POSTGRES_DB:-doska}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    logging: &logging
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+
+  backend:
+    build:
+      context: .
+      target: backend
+      secrets: [npm_ca]
+    image: doska/backend:${DOSKA_VERSION:-latest}
+    restart: unless-stopped
+    # Init Docker (tini): сигналы остановки доходят до сервера, зомби-процессы убираются.
+    init: true
+    # Настройки сервера; другой файл — DOSKA_ENV_FILE (например, для проверки рядом с рабочей установкой).
+    env_file: ${DOSKA_ENV_FILE:-.env}
+    environment:
+      NODE_ENV: production
+      HOST: 0.0.0.0
+      PORT: "3000"
+      TRUST_PROXY: "true"
+      DATABASE_URL: postgresql://${POSTGRES_USER:-doska}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-doska}?schema=public
+      # Файлы — на диске в томе uploads (S3/MinIO — задайте S3_ENDPOINT в .env).
+      UPLOADS_DIR: /data/uploads
+      S3_ENDPOINT: ${S3_ENDPOINT:-}
+    volumes:
+      - uploads:/data/uploads
+    depends_on:
+      db:
+        condition: service_healthy
+    logging: *logging
+
+  web:
+    build:
+      context: .
+      target: web
+      secrets: [npm_ca]
+    image: doska/web:${DOSKA_VERSION:-latest}
+    restart: unless-stopped
+    environment:
+      DOMAIN: ${DOMAIN:-}
+    ports:
+      - "${HTTP_PORT:-80}:80"
+      - "${HTTPS_PORT:-443}:443"
+    volumes:
+      - certbot-www:/var/www/certbot:ro
+      - letsencrypt:/etc/letsencrypt:ro
+    depends_on:
+      backend:
+        condition: service_healthy
+    logging: *logging
+
+  certbot:
+    profiles: [tls]
+    image: certbot/certbot:v4.2.0
+    restart: unless-stopped
+    volumes:
+      - certbot-www:/var/www/certbot
+      - letsencrypt:/etc/letsencrypt
+    # Проверка продления дважды в сутки; Nginx перечитывает сертификат сам (раз в 6 ч).
+    entrypoint: ["/bin/sh", "-c", "trap exit TERM; while :; do certbot renew --webroot -w /var/www/certbot --quiet; sleep 12h & wait $${!}; done"]
+    logging: *logging
+
   formula-ocr:
     profiles: [ocr]
     build: ./services/formula-ocr
@@ -18,11 +106,23 @@ services:
       LOG_LEVEL: INFO
       # Файловая система только для чтения: кэши библиотек — во временный каталог.
       HOME: /tmp
-    # Порт только на локальном адресе: сервис не должен быть доступен извне.
-    ports:
-      - "127.0.0.1:8502:8502"
+    # Сервис доступен только серверу внутри сети Compose (FORMULA_OCR_URL=http://formula-ocr:8502/predict).
+    expose:
+      - "8502"
     # Модель занимает около 1,5 ГБ памяти при работе.
     mem_limit: 3g
     read_only: true
     tmpfs:
       - /tmp
+    logging: *logging
+
+volumes:
+  pgdata:
+  uploads:
+  certbot-www:
+  letsencrypt:
+
+# Сертификат прокси для npm при сборке (необязательно): DOSKA_NPM_CA=/путь/ca.pem.
+secrets:
+  npm_ca:
+    file: ${DOSKA_NPM_CA:-/dev/null}
