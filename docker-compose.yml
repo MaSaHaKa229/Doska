@@ -43,6 +43,8 @@ services:
       context: .
       target: backend
       secrets: [npm_ca]
+      args:
+        PRISMA_ENGINES_MIRROR: ${PRISMA_ENGINES_MIRROR:-}
     image: doska/backend:${DOSKA_VERSION:-latest}
     restart: unless-stopped
     # Init Docker (tini): сигналы остановки доходят до сервера, зомби-процессы убираются.
@@ -70,6 +72,8 @@ services:
       context: .
       target: web
       secrets: [npm_ca]
+      args:
+        PRISMA_ENGINES_MIRROR: ${PRISMA_ENGINES_MIRROR:-}
     image: doska/web:${DOSKA_VERSION:-latest}
     restart: unless-stopped
     environment:

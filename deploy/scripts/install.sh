@@ -9,11 +9,12 @@
 # Ключи: --domain ДОМЕН --email ПОЧТА | --ip АДРЕС; --admin-login ЛОГИН;
 # --admin-password ПАРОЛЬ (иначе — случайный); --http-port N --https-port N;
 # --ocr (распознавание рукописных формул, нужно ~3 ГБ памяти);
+# --prisma-mirror АДРЕС (зеркало движков Prisma, если binaries.prisma.sh недоступен);
 # --no-build (уже собранные образы); --force (перезаписать существующий .env).
 set -euo pipefail
 . "$(dirname "$0")/common.sh"
 
-DOMAIN_ARG='' EMAIL_ARG='' IP_ARG='' ADMIN_LOGIN='admin' ADMIN_PASSWORD='' HTTP_PORT_ARG=80 HTTPS_PORT_ARG=443 OCR=0 BUILD=1 FORCE=0
+DOMAIN_ARG='' EMAIL_ARG='' IP_ARG='' ADMIN_LOGIN='admin' ADMIN_PASSWORD='' HTTP_PORT_ARG=80 HTTPS_PORT_ARG=443 OCR=0 BUILD=1 FORCE=0 PRISMA_MIRROR=''
 while [ $# -gt 0 ]; do
   case "$1" in
     --domain) DOMAIN_ARG=$2; shift 2 ;;
@@ -24,6 +25,7 @@ while [ $# -gt 0 ]; do
     --http-port) HTTP_PORT_ARG=$2; shift 2 ;;
     --https-port) HTTPS_PORT_ARG=$2; shift 2 ;;
     --ocr) OCR=1; shift ;;
+    --prisma-mirror) PRISMA_MIRROR=$2; shift 2 ;;
     --no-build) BUILD=0; shift ;;
     --force) FORCE=1; shift ;;
     -h|--help) sed -n '2,13p' "$0"; exit 0 ;;
@@ -106,6 +108,7 @@ set_kv HTTP_PORT "$HTTP_PORT_ARG"
 set_kv HTTPS_PORT "$HTTPS_PORT_ARG"
 set_kv COMPOSE_PROFILES "$PROFILES"
 set_kv S3_ENDPOINT ''
+set_kv PRISMA_ENGINES_MIRROR "$PRISMA_MIRROR"
 set_kv SEED_ADMIN_LOGIN "$ADMIN_LOGIN"
 set_kv SEED_ADMIN_PASSWORD "$ADMIN_PASSWORD"
 if [ $OCR -eq 1 ]; then
