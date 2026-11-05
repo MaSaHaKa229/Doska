@@ -66,11 +66,13 @@ export function xyOf(flat: readonly number[]): number[] {
 }
 
 // Готовые пути по массиву точек: штрих перерисовывается при любом
-// изменении слоя, а точки меняются редко.
+// изменении слоя, а точки меняются редко. Живой штрих (оверлей пера)
+// дописывает точки в тот же массив, поэтому в ключе — и их число:
+// иначе во время рисования виден только путь из первой точки.
 const pathCache = new WeakMap<readonly number[], { key: string; path: Path2D }>();
 
 function cachedPath(p: Pick<StrokeProps, 'points' | 'width' | 'pressure' | 'closed'>): Path2D {
-  const key = `${p.width}|${p.pressure}|${!!p.closed}`;
+  const key = `${p.points.length}|${p.width}|${p.pressure}|${!!p.closed}`;
   const hit = pathCache.get(p.points);
   if (hit && hit.key === key) return hit.path;
   const path = p.pressure && !p.closed ? smoothPath(strokeOutline(p.points, p.width, true), true) : smoothPath(xyOf(p.points), !!p.closed);
