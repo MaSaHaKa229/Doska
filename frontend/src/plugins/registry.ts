@@ -10,9 +10,10 @@ import { textModule } from '../objects/text';
 import { textTool } from '../tools/text-tool';
 import { formulaModule, FORMULA_TYPE } from '../objects/formula';
 import { solutionModule } from '../objects/solution';
-import { calcTool, formulaTool, solutionTool } from '../tools/formula-tools';
+import { calcTool, formulaTool, referenceTool, solutionTool } from '../tools/formula-tools';
 import { calcModule } from '../objects/calc';
 import { allPaletteItems } from '../formula/palette';
+import { REFERENCE } from '../formula/reference';
 import { mediaTool } from '../tools/media-tool';
 
 /**
@@ -31,8 +32,19 @@ export const corePlugin: BoardPlugin<ReactNode> = {
     section: `Формулы · ${it.section}`,
     keywords: [...it.keywords, 'формула'],
     action: { kind: 'insert' as const, objectType: FORMULA_TYPE, props: { latex: it.example } },
-  })),
-  tools: [selectTool, handTool, laserTool, penTool, markerTool, eraserTool, ...(['rect', 'ellipse', 'triangle', 'line', 'arrow'] as const).map(shapeTool), textTool, formulaTool, solutionTool, calcTool, mediaTool],
+  })).concat(
+    // Справочник формул (8.1b): каждая формула ищется в Ctrl+K и вставляется на доску.
+    REFERENCE.flatMap((t) =>
+      t.items.map((it, n) => ({
+        id: `core.reference.${t.id}-${n}`,
+        title: it.title,
+        section: `Справочник · ${t.title}`,
+        keywords: [...it.keywords, t.title.toLowerCase(), 'справочник', 'формула'],
+        action: { kind: 'insert' as const, objectType: FORMULA_TYPE, props: { latex: it.latex, size: 28 } },
+      })),
+    ),
+  ),
+  tools: [selectTool, handTool, laserTool, penTool, markerTool, eraserTool, ...(['rect', 'ellipse', 'triangle', 'line', 'arrow'] as const).map(shapeTool), textTool, formulaTool, solutionTool, calcTool, referenceTool, mediaTool],
 };
 
 /**

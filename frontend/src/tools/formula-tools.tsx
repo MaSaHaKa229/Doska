@@ -74,3 +74,23 @@ export const calcTool: ToolModule<ReactNode> = {
     queueMicrotask(() => ctx.activateTool('core.select'));
   },
 };
+
+export const REFERENCE_TOOL_ID = 'core.reference';
+
+/**
+ * «Справочник формул»: панель с темами математики и физики, поиском и
+ * вставкой формулы на доску. Открыть может любой участник, вставить — тот,
+ * у кого есть право записи.
+ */
+export const referenceTool: ToolModule<ReactNode> = {
+  id: REFERENCE_TOOL_ID,
+  title: 'Справочник формул',
+  icon: 'BookOpenText',
+  group: 'formulas',
+  keywords: ['справочник', 'формулы', 'шпаргалка', 'теорема', 'закон', 'reference'],
+  requiresWrite: false,
+  onActivate(ctx) {
+    requestObjectEditor({ editor: 'reference', id: null, at: null });
+    queueMicrotask(() => ctx.activateTool('core.select'));
+  },
+};

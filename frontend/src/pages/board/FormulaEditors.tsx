@@ -15,6 +15,7 @@ import { CALC_TYPE, type CalcProps } from '../../objects/calc';
 import { latexToMathjs } from '../../formula/latex-to-mathjs';
 import type { CalcResult } from '../../formula/calc';
 import { CalcPanel } from './CalcPanel';
+import { ReferencePanel } from './ReferencePanel';
 
 /** Запись для калькулятора из выделенной формулы (если её можно посчитать). */
 function selectedExpression(model: BoardModel): string {
@@ -38,12 +39,18 @@ export function FormulaEditorsHost({ model }: { model: BoardModel }) {
   // Калькулятор — отдельная панель: она остаётся открытой рядом с другими редакторами.
   const [calc, setCalc] = useState<{ id: string | null; at: EditObjectDetail['at']; initial: string } | null>(null);
   const caps = useBoard((s) => s.caps);
+  // Справочник формул — тоже отдельная панель.
+  const [refOpen, setRefOpen] = useState(false);
 
   useEffect(() => {
     const onEdit = (e: Event) => {
       const d = (e as CustomEvent<EditObjectDetail>).detail;
       // Редакторы плагинов открывает PluginEditorsHost.
-      if (d.editor !== 'formula' && d.editor !== 'solution' && d.editor !== 'calc') return;
+      if (d.editor !== 'formula' && d.editor !== 'solution' && d.editor !== 'calc' && d.editor !== 'reference') return;
+      if (d.editor === 'reference') {
+        setRefOpen(true);
+        return;
+      }
       if (d.editor === 'calc') {
         const id = d.id && model.canModify(d.id, 'props') ? d.id : null;
         const initial = d.id ? String((model.getObject(d.id)?.props as CalcProps | undefined)?.expr ?? '') : selectedExpression(model);
@@ -132,6 +139,15 @@ export function FormulaEditorsHost({ model }: { model: BoardModel }) {
         canInsert={!!caps?.write}
         onClose={() => setCalc(null)}
         onInsert={insertCalc}
+      />
+      <ReferencePanel
+        open={refOpen}
+        canInsert={!!caps?.write}
+        onClose={() => setRefOpen(false)}
+        onInsert={(latex) => {
+          const props: FormulaProps = { latex, size: 28, color: useBoard.getState().toolOptions.stroke };
+          create(FORMULA_TYPE, props, formulaSize(props), null);
+        }}
       />
     </>
   );

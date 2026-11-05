@@ -1,4 +1,5 @@
 import {
+  BookOpenText,
   Calculator,
   Circle,
   Eraser,
@@ -24,6 +25,7 @@ import {
  * иконки. Плагины добавляют свои иконки через registerIcons.
  */
 const ICONS: Record<string, LucideIcon> = {
+  BookOpenText,
   Calculator,
   Circle,
   Eraser,

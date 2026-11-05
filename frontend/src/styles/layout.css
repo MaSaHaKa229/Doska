@@ -1324,3 +1324,47 @@ fieldset.given-editor {
   font-weight: 600;
   margin: 10px 0 6px;
 }
+
+/* ---------- Справочник формул ---------- */
+.ref-panel {
+  width: min(420px, calc(100vw - 32px));
+}
+.ref-panel__list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.ref-panel__topic {
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px solid var(--border);
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--text-2);
+}
+.ref-panel__item {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  padding: 6px 4px;
+  border-radius: var(--radius-s, 6px);
+}
+.ref-panel__item:hover {
+  background: var(--surface-2);
+}
+.ref-panel__title {
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+.ref-panel__math {
+  max-width: 100%;
+  overflow-x: auto;
+  font-size: 1.1rem;
+  padding: 2px 0;
+}
