@@ -259,3 +259,5 @@ doc.transact(() => {
      нет в текущем → создать; есть и отличается → записать различающиеся поля
 }, SERVER)
 ```
+
+Реализация (этап 8.2b): `backend/src/realtime/restore.ts` (`restoreFromState`, сначала страницы, затем объекты; поля, которых нет в версии, удаляются; `meta` не трогается), вызов — `VersionsService.restore` через `Room.applyServerChange` (рассылка всем и запись в журнал обновлений), уведомление участникам `notice` с кодом `VERSION_RESTORED`, журнал действий `BOARD_VERSION_RESTORED`. API — `/api/boards/:id/versions` (`backend/src/boards/versions.routes.ts`).

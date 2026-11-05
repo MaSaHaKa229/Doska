@@ -33,7 +33,7 @@ const VIEW_ONLY: BoardCapabilities = {
 
 const noop = () => undefined;
 
-function newViewModel(doc: Y.Doc): BoardModel {
+export function newViewModel(doc: Y.Doc): BoardModel {
   return new BoardModel(doc, { userId: '', registry, getCaps: () => VIEW_ONLY, ownerId: '' });
 }
 

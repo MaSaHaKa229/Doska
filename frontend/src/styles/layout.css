@@ -1368,3 +1368,48 @@ fieldset.given-editor {
   font-size: 1.1rem;
   padding: 2px 0;
 }
+
+/* ---------- История версий ---------- */
+.versions-panel {
+  width: min(400px, calc(100vw - 32px));
+}
+.versions-panel__list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border-top: 1px solid var(--border);
+  padding-top: 6px;
+}
+.versions-panel__list li.is-selected {
+  background: var(--surface-2);
+  border-radius: 8px;
+}
+.versions-panel__item {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1px;
+  width: 100%;
+  padding: 6px 8px;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.versions-panel__item:hover {
+  background: var(--surface-2);
+}
+.versions-panel__when {
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+.versions-panel__preview .thumb {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+}

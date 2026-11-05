@@ -23,12 +23,21 @@ export const assignmentsApi = {
  * запрос идёт напрямую через fetch; при истёкшем токене сессия
  * обновляется один раз.
  */
-export async function fetchBoardSnapshot(boardId: string, signal?: AbortSignal): Promise<Uint8Array> {
+export function fetchBoardSnapshot(boardId: string, signal?: AbortSignal): Promise<Uint8Array> {
+  return fetchBinary(`/api/boards/${boardId}/snapshot`, 'Снимок доски недоступен', signal);
+}
+
+/** Документ версии доски (история версий, предпросмотр). */
+export function fetchVersionSnapshot(boardId: string, versionId: string, signal?: AbortSignal): Promise<Uint8Array> {
+  return fetchBinary(`/api/boards/${boardId}/versions/${versionId}/snapshot`, 'Версия недоступна', signal);
+}
+
+async function fetchBinary(url: string, failure: string, signal?: AbortSignal): Promise<Uint8Array> {
   for (let attempt = 0; attempt < 2; attempt++) {
-    const res = await fetch(`/api/boards/${boardId}/snapshot`, { credentials: 'same-origin', signal });
+    const res = await fetch(url, { credentials: 'same-origin', signal });
     if (res.status === 401 && attempt === 0 && (await refreshSession())) continue;
-    if (!res.ok) throw new Error(`Снимок доски недоступен (${res.status})`);
+    if (!res.ok) throw new Error(`${failure} (${res.status})`);
     return new Uint8Array(await res.arrayBuffer());
   }
-  throw new Error('Снимок доски недоступен');
+  throw new Error(failure);
 }

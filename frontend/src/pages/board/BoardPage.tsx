@@ -19,6 +19,7 @@ import type { CanvasTheme } from '../../objects/colors';
 import { CursorsLayer, Participants } from './PresenceUi';
 import { ViewMenu } from './ViewMenu';
 import { ExportDialog } from './ExportDialog';
+import { VersionsPanel } from './VersionsPanel';
 import { FollowBanner, HandButton, HandsIndicator, LessonMenu } from './LessonUi';
 import { LaserLayer } from './LaserLayer';
 import { WorkBar } from './WorkBar';
@@ -138,8 +139,9 @@ function BoardWorkspace({ session }: { session: BoardSession }) {
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
-  const ui = useMemo(() => ({ palette: () => setPaletteOpen(true), help: () => setHelpOpen(true), export: () => setExportOpen(true) }), []);
-  const paletteCommands = useMemo(() => coreCommands(commands, model, { help: ui.help, export: ui.export }), [commands, model, ui]);
+  const [versionsOpen, setVersionsOpen] = useState(false);
+  const ui = useMemo(() => ({ palette: () => setPaletteOpen(true), help: () => setHelpOpen(true), export: () => setExportOpen(true), versions: () => setVersionsOpen(true) }), []);
+  const paletteCommands = useMemo(() => coreCommands(commands, model, { help: ui.help, export: ui.export, versions: ui.versions }), [commands, model, ui]);
   const pendingChanges = useBoard((s) => s.pendingChanges);
   useBoardShortcuts(commands, ui);
   // Картинки и PDF: импорт PDF — через диалог; файлы от инструмента «Картинка или PDF».
@@ -231,7 +233,7 @@ function BoardWorkspace({ session }: { session: BoardSession }) {
           </span>
         </Badge>
         <Button size="small" variant="ghost" iconOnly icon={<Search size={18} />} aria-label="Поиск инструментов и команд (Ctrl+K)" title="Поиск инструментов и команд (Ctrl+K)" onClick={ui.palette} />
-        <ViewMenu model={model} onHelp={ui.help} onExport={ui.export} />
+        <ViewMenu model={model} onHelp={ui.help} onExport={ui.export} onVersions={ui.versions} />
         <Button size="small" variant="ghost" iconOnly icon={<Undo2 size={18} />} aria-label="Отменить (Ctrl+Z)" title="Отменить (Ctrl+Z)" disabled={!canUndo} onClick={() => commands.undo()} />
         <Button size="small" variant="ghost" iconOnly icon={<Redo2 size={18} />} aria-label="Повторить (Ctrl+Shift+Z)" title="Повторить (Ctrl+Shift+Z)" disabled={!canRedo} onClick={() => commands.redo()} />
       </header>
@@ -294,6 +296,7 @@ function BoardWorkspace({ session }: { session: BoardSession }) {
       />
       <PdfImportDialog model={model} request={pdfRequest} onClose={() => setPdfRequest(null)} />
       <HelpDialog open={helpOpen} onClose={() => setHelpOpen(false)} commands={paletteCommands} />
+      {board && <VersionsPanel open={versionsOpen} boardId={board.id} onClose={() => setVersionsOpen(false)} />}
       <ExportDialog open={exportOpen} onClose={() => setExportOpen(false)} model={model} title={board?.title ?? 'Доска'} />
       <ConfirmDialog
         open={!!dependentsRequest}

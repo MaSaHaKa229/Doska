@@ -18,7 +18,7 @@ export interface PaletteCommand {
 }
 
 /** Встроенные команды ядра (инструменты плагинов добавляются из реестра). */
-export function coreCommands(commands: BoardCommands, model: BoardModel, extra: { help: () => void; export: () => void }): PaletteCommand[] {
+export function coreCommands(commands: BoardCommands, model: BoardModel, extra: { help: () => void; export: () => void; versions: () => void }): PaletteCommand[] {
   const st = () => useBoard.getState();
   const hasSel = () => st().selection.length > 0;
   const canWrite = () => !!st().caps?.write;
@@ -73,6 +73,7 @@ export function coreCommands(commands: BoardCommands, model: BoardModel, extra: 
     { id: 'next-page', title: 'Следующая страница', keywords: ['страница', 'вперёд'], hotkey: 'PageDown', section: 'Страницы', enabled: () => true, run: () => commands.gotoPage(1) },
     { id: 'prev-page', title: 'Предыдущая страница', keywords: ['страница', 'назад'], hotkey: 'PageUp', section: 'Страницы', enabled: () => true, run: () => commands.gotoPage(-1) },
     { id: 'export', title: 'Экспорт: PNG, SVG, PDF…', keywords: ['экспорт', 'сохранить', 'скачать', 'картинка', 'pdf', 'png', 'svg', 'печать'], hotkey: 'Ctrl+Shift+E', section: 'Файл', enabled: () => true, run: extra.export },
+    { id: 'versions', title: 'История версий…', keywords: ['версия', 'история', 'восстановить', 'откатить', 'сохранить версию', 'резервная копия'], section: 'Файл', enabled: () => !!st().caps?.restoreVersions, run: extra.versions },
     { id: 'help', title: 'Горячие клавиши', keywords: ['справка', 'помощь', 'клавиши', 'help'], hotkey: '?', section: 'Справка', enabled: () => true, run: extra.help },
   ];
 }
