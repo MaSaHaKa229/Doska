@@ -63,7 +63,23 @@ export const backgroundSchema = z.object({
   /** Для полярной сетки — центр. */
   originX: z.number().finite(),
   originY: z.number().finite(),
+  /**
+   * Страница PDF как фон: файл (Asset), номер страницы (с 1) и размер в
+   * мировых единицах; левый верхний угол — в начале координат страницы.
+   */
+  pdf: z
+    .object({
+      assetId: z.string().uuid(),
+      page: z.number().int().min(1).max(10_000),
+      width: z.number().finite().positive().max(1e6),
+      height: z.number().finite().positive().max(1e6),
+    })
+    .nullable()
+    .optional(),
 });
+
+/** Мировых единиц в типографском пункте PDF: клетка 5 мм = 20 ед., 1 пт = 25,4/72 мм. */
+export const PDF_POINT_TO_WORLD = (20 / 5) * (25.4 / 72);
 export type Background = z.infer<typeof backgroundSchema>;
 
 export const DEFAULT_BACKGROUND: Background = {

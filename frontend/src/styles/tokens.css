@@ -1,0 +1,70 @@
+/* Цветовые токены. Тема задаётся атрибутом data-theme на <html>. */
+:root,
+:root[data-theme='light'] {
+  color-scheme: light;
+  --bg: #f6f7f5;
+  --surface: #ffffff;
+  --surface-2: #f0f2ef;
+  --surface-3: #e5e9e4;
+  --border: #d9ded7;
+  --border-strong: #b9c1b6;
+  --text: #1b2420;
+  --text-2: #4b5751;
+  --text-3: #75817b;
+  --accent: #1f6f5c;
+  --accent-hover: #185a4a;
+  --accent-soft: #e2f1ec;
+  --accent-text: #ffffff;
+  --danger: #c62f2f;
+  --danger-soft: #fbe7e7;
+  --warning: #a86200;
+  --warning-soft: #fdf1dc;
+  --success: #1d7a3f;
+  --success-soft: #e1f4e7;
+  --info: #2557b8;
+  --info-soft: #e5edfb;
+  --focus: #3b82f6;
+  --shadow-1: 0 1px 2px rgb(16 24 20 / 6%), 0 1px 3px rgb(16 24 20 / 8%);
+  --shadow-2: 0 8px 28px rgb(16 24 20 / 16%);
+  --backdrop: rgb(16 24 20 / 42%);
+}
+
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  --bg: #121614;
+  --surface: #1a1f1d;
+  --surface-2: #222826;
+  --surface-3: #2c3330;
+  --border: #323a37;
+  --border-strong: #4a5450;
+  --text: #e8ece9;
+  --text-2: #b4bdb8;
+  --text-3: #87918c;
+  --accent: #4fb89a;
+  --accent-hover: #67c9ac;
+  --accent-soft: #1c3a32;
+  --accent-text: #0d1f1a;
+  --danger: #f07070;
+  --danger-soft: #3c1f1f;
+  --warning: #f0b45a;
+  --warning-soft: #3a2e17;
+  --success: #6bd08f;
+  --success-soft: #1a3324;
+  --info: #7ea6f3;
+  --info-soft: #1d2a45;
+  --focus: #7ea6f3;
+  --shadow-1: 0 1px 2px rgb(0 0 0 / 40%);
+  --shadow-2: 0 10px 32px rgb(0 0 0 / 55%);
+  --backdrop: rgb(0 0 0 / 60%);
+}
+
+:root {
+  --radius-s: 6px;
+  --radius: 10px;
+  --radius-l: 14px;
+  --font: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --font-mono: ui-monospace, 'JetBrains Mono', 'Cascadia Mono', Consolas, monospace;
+  /* Минимальная зона нажатия — удобно на планшете. */
+  --tap: 40px;
+  --ease: cubic-bezier(0.2, 0, 0, 1);
+}

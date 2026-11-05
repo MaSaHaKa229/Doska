@@ -214,3 +214,16 @@ export function createObjectBase(params: {
 export type ObjectPatch<P = Record<string, JsonValue>> = Partial<
   Omit<BoardObject<P>, 'id' | 'type' | 'createdBy' | 'createdAt' | 'props'>
 > & { props?: Partial<P> };
+
+const ID_ALPHABET = 'useandom-26T198340PX75pxJACKVERYMINDBUSHWOLF_GQZbfghjklqvwyzrict';
+
+/**
+ * Новый id объекта/страницы: 21 случайный символ (как nanoid), ~126 бит.
+ * Использует crypto.getRandomValues — доступен и в браузере, и в Node.js 22.
+ */
+export function newEntityId(size = 21): string {
+  const bytes = crypto.getRandomValues(new Uint8Array(size));
+  let id = '';
+  for (let i = 0; i < size; i++) id += ID_ALPHABET[bytes[i]! & 63];
+  return id;
+}

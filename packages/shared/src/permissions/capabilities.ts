@@ -45,8 +45,11 @@ export interface BoardAccessFacts {
   teachesOwner: boolean;
   /** У пользователя есть «мел» (ChalkGrant). */
   hasChalk: boolean;
-  /** Для ASSIGNMENT_WORK: данные задания. */
-  assignment?: { studentId: string; closed: boolean } | undefined;
+  /**
+   * Для ASSIGNMENT_WORK: данные задания. submitted — работа сдана или
+   * проверена: ученик её больше не меняет, пока учитель не вернёт на доработку.
+   */
+  assignment?: { studentId: string; closed: boolean; submitted?: boolean } | undefined;
   /** Для TEMPLATE: шаблон виден пользователю (встроенный/общий/выдан ему). */
   templateVisible?: boolean | undefined;
 }
@@ -57,6 +60,7 @@ export type NoWriteReason =
   | 'no-chalk'
   | 'read-only'
   | 'assignment-closed'
+  | 'assignment-submitted'
   | 'no-access';
 
 export interface BoardCapabilities {
@@ -185,18 +189,21 @@ export function computeCapabilities(f: BoardAccessFacts): BoardCapabilities {
   // role === 'student'
   if (board.kind === 'ASSIGNMENT_WORK') {
     const closed = f.assignment?.closed ?? false;
+    const submitted = f.assignment?.submitted ?? false;
+    const locked = closed || submitted;
     return {
       ...NONE,
       role,
       view: true,
-      write: !closed,
-      noWriteReason: closed ? 'assignment-closed' : null,
-      managePages: !closed,
+      write: !locked,
+      noWriteReason: closed ? 'assignment-closed' : submitted ? 'assignment-submitted' : null,
+      managePages: !locked,
       // Объекты шаблона (созданы учителем, не заблокированы) ученик может
       // двигать — например, точку для исследования. Пометки review и
       // заблокированные объекты защищены правилами object-rules.ts.
-      editOthers: !closed,
-      editTeacherObjects: !closed,
+      editOthers: !locked,
+      editTeacherObjects: !locked,
+      laser: !locked,
       raiseHand: true,
     };
   }
@@ -243,6 +250,8 @@ export function noWriteHint(reason: NoWriteReason | null): string | null {
       return 'Эта доска открыта только для просмотра.';
     case 'assignment-closed':
       return 'Задание закрыто: работу больше нельзя изменять.';
+    case 'assignment-submitted':
+      return 'Работа сдана на проверку, изменять её нельзя. Пока учитель не проверил, сдачу можно отменить; после проверки — исправить, если учитель вернёт работу на доработку.';
     case 'no-access':
       return 'Нет доступа к этой доске.';
   }

@@ -1,6 +1,6 @@
 import type { z } from 'zod';
 import type { Point, Rect } from '../board/geometry.js';
-import type { BoardObject, ObjectPatch } from '../board/object.js';
+import type { BoardObject, ObjectLayer, ObjectPatch } from '../board/object.js';
 import type { JsonValue } from '../board/json.js';
 
 /**
@@ -121,7 +121,13 @@ export type InspectorField =
       slider?: boolean;
     }
   | { kind: 'toggle'; key: string; label: string }
-  | { kind: 'select'; key: string; label: string; options: { value: string; label: string }[] };
+  | { kind: 'select'; key: string; label: string; options: { value: string; label: string }[] }
+  /**
+   * Кнопка действия (этап 7.2a): «Пуск», «Сначала», «Графики». Нажатие
+   * вызывает ObjectModule.runAction(obj, key, ctx) для каждого выделенного
+   * объекта этого типа — одним шагом отмены.
+   */
+  | { kind: 'action'; key: string; label: string };
 
 // ---------------------------------------------------------------------
 //  Модуль объекта
@@ -170,6 +176,18 @@ export interface ObjectModule<P = Record<string, JsonValue>, R = unknown> {
     ctx: ResolveContext,
   ): ObjectPatch<P> | null;
 
+  /**
+   * Завершение жеста ручки (отпускание): побочные действия через API
+   * инструмента — например, циркуль ставит начерченную дугу. Выполняется в
+   * том же шаге отмены, что и сам жест.
+   */
+  finishHandle?(obj: BoardObject<P>, handleId: string, ctx: ToolContext): void;
+  /**
+   * Прямые края (мировые координаты), вдоль которых перо рисует ровную линию:
+   * линейка, угольник. Штрих, начатый у края, проецируется на него.
+   */
+  guides?(obj: BoardObject<P>, ctx: ResolveContext): { a: Point; b: Point }[];
+
   /** Точки привязки (концы, середины, центры…) в мировых координатах. */
   getSnapPoints?(obj: BoardObject<P>, ctx: ResolveContext): SnapPoint[];
   /** Кривые для вычисления пересечений с другими объектами. */
@@ -182,13 +200,49 @@ export interface ObjectModule<P = Record<string, JsonValue>, R = unknown> {
 
   /** Поля контекстной панели свойств. */
   inspector?: InspectorField[];
+  /**
+   * Действие кнопки панели свойств (поле kind: 'action'): изменения через
+   * API записи (ctx.updateObject, ctx.createObject). ctx.now — время нажатия
+   * (Date.now()), например для общего у всех участников воспроизведения.
+   */
+  runAction?(obj: BoardObject<P>, key: string, ctx: ActionContext): void;
   /** Поведение рамки трансформации. */
   transform?: {
     rotatable: boolean;
     resize: 'free' | 'proportional' | 'none';
   };
+  /**
+   * Растяжение рамкой меняет свойства, а не масштаб (текст переносится,
+   * буквы не растягиваются). Получает новые scaleX/scaleY после рамки и
+   * возвращает изменения объекта (обычно новые размеры в props и прежний масштаб).
+   */
+  applyResize?(obj: BoardObject<P>, scaleX: number, scaleY: number): ObjectPatch<P>;
   /** Имя редактора, открываемого двойным кликом ('formula', 'text', 'matrix'…). */
   editor?: string;
+  /**
+   * Геометрия задаётся опорными объектами (deps) — динамическая геометрия.
+   * x, y, поворот и масштаб такого объекта не используются: render, габарит
+   * и попадание — в мировых координатах. Перемещение объекта двигает его
+   * свободные опорные объекты (точки), рамки трансформации у него нет.
+   */
+  derived?: boolean;
+  /**
+   * Какие опоры производного объекта двигаются, когда тянут сам объект
+   * (по умолчанию — все). График двигает свою систему координат, но не
+   * слайдеры параметров.
+   */
+  moveDeps?(obj: BoardObject<P>): string[];
+  /**
+   * Приоритет при выборе объекта под курсором: больше — выбирается раньше
+   * объектов выше по слою (точку на отрезке можно взять мышью). По умолчанию 0.
+   */
+  hitPriority?: number;
+  /**
+   * Объект уходит за пределы габарита (прямая, луч): он рисуется и ищется
+   * под курсором при любой видимой области, а габарит (для «Показать всё»)
+   * описывает только его опорную часть.
+   */
+  unbounded?: boolean;
   /**
    * Тяжёлое вычисление в Web Worker: имя задания и входные данные.
    * Ядро перезапускает задание при изменении входа (с отменой старого).
@@ -239,15 +293,56 @@ export interface ToolContext {
   readonly pageId: string;
   readonly canWrite: boolean;
   resolve: ResolveContext;
-  createObject<P>(type: string, init: { x: number; y: number; props: P; deps?: string[] }): string;
+  /**
+   * Создать объект на текущей странице. placement: 'bottom' — под остальными
+   * объектами слоя (маркер ложится под рисунок); по умолчанию — поверх.
+   * Возвращает id или '' (нет права).
+   */
+  createObject<P>(
+    type: string,
+    init: {
+      x: number;
+      y: number;
+      props: P;
+      deps?: string[];
+      placement?: 'top' | 'bottom';
+      layer?: ObjectLayer;
+      /** Поворот (рад) и масштаб сразу при создании: в той же транзакции объект ещё не изменить. */
+      rotation?: number;
+      scaleX?: number;
+      scaleY?: number;
+    },
+  ): string;
   updateObject<P>(id: string, patch: ObjectPatch<P>): void;
   deleteObjects(ids: string[]): void;
-  /** Транзакция: несколько изменений = один шаг отмены. */
-  transact(fn: () => void): void;
+  /**
+   * Транзакция: несколько изменений = один шаг отмены. merge: true —
+   * продолжение того же жеста (ластик ведётся по доске): склеивается с
+   * предыдущим шагом.
+   */
+  transact(fn: () => void, opts?: { merge?: boolean }): void;
+  /** Можно ли изменить / удалить объект (предварительная проверка прав). */
+  canModify(id: string): boolean;
+  canDelete(id: string): boolean;
+  /**
+   * Недорисованный штрих — другие участники видят его во время рисования
+   * (awareness.drawing; страницу подставляет ядро). null — штриха нет.
+   */
+  publishDrawing(drawing: { tool: string; color: string; width: number; opacity: number; points: number[] } | null): void;
   hitTest(point: Point, tolerance: number): BoardObject[];
+  /** Объекты текущей страницы (по типу или все) — например, чтобы выбрать свободную подпись точки. */
+  listObjects(type?: string): BoardObject[];
+  /** Прямые края-направляющие объектов текущей страницы (ObjectModule.guides). */
+  guides(): { a: Point; b: Point }[];
   setSelection(ids: string[]): void;
+  /** Текущее выделение (например, фигуры для преобразования, выбранные до инструмента). */
+  getSelection(): string[];
   /** Предпросмотр (рисуется в оверлее и транслируется в awareness.drawing). */
   setPreview(preview: unknown | null): void;
+  /** Текущий предпросмотр инструмента (для renderOverlay). */
+  getPreview<T>(): T | null;
+  /** Переводит экранное расстояние в мировое при текущем зуме (допуски, толщина ручек). */
+  screenToWorld(px: number): number;
   /** Переключиться на другой инструмент (например, обратно на выделение). */
   activateTool(id: string): void;
   /** Значения панели свойств инструмента (цвет, толщина). */
@@ -269,6 +364,11 @@ export interface ToolModule<R = unknown> {
   keywords: string[];
   /** Инструмент изменяет документ (неактивен без права записи). */
   requiresWrite: boolean;
+  /**
+   * Дополнительное право, без которого инструмент неактивен (например,
+   * лазерная указка — право laser, которое не совпадает с правом записи).
+   */
+  requiresCapability?: 'laser' | 'moderate' | 'leadFollow';
   /** Нужно ли ядру вычислять привязки для событий. */
   snapping?: boolean;
   cursor?: string;
@@ -327,6 +427,34 @@ export interface ReferenceEntry {
 //  Плагин
 // ---------------------------------------------------------------------
 
+/**
+ * API редактора объекта плагина (диалог, открываемый двойным щелчком или
+ * инструментом): то же, что у инструмента, без указателя и предпросмотра.
+ */
+export type EditorContext = Pick<
+  ToolContext,
+  'userId' | 'pageId' | 'canWrite' | 'resolve' | 'createObject' | 'updateObject' | 'deleteObjects' | 'transact' | 'canModify' | 'listObjects' | 'setSelection' | 'getToolOptions'
+>;
+
+/** API действия кнопки панели свойств (ObjectModule.runAction). */
+export type ActionContext = EditorContext & { now: number };
+
+/** Свойства редактора плагина. objectId null — создать новый объект (в точке at). */
+export interface PluginEditorProps {
+  objectId: string | null;
+  at: Point | null;
+  ctx: EditorContext;
+  close(): void;
+  /**
+   * Нет права изменить объект: редактор открыт только для просмотра
+   * (имя редактора есть в BoardPlugin.viewers) — например, ученик вращает
+   * 3D-сцену учителя у себя, ничего не записывая.
+   */
+  readOnly: boolean;
+  /** Подписка на изменения объекта в документе (правки других участников). */
+  subscribeObject(id: string, listener: () => void): () => void;
+}
+
 export type WorkerFactory = () => { postMessage(data: unknown): void; terminate(): void };
 
 export interface BoardPlugin<R = unknown> {
@@ -335,11 +463,27 @@ export interface BoardPlugin<R = unknown> {
   title: string;
   /** Плагины, которые должны быть зарегистрированы раньше (общие объекты). */
   dependsOn?: string[];
+  /**
+   * Названия подразделов инструментов (ToolModule.section) внутри плагина:
+   * «math.planimetry.constructions» → «Построения». Подраздел с id самого
+   * плагина называется его title.
+   */
+  sections?: Record<string, string>;
   objects?: ObjectModule<any, R>[];
   tools?: ToolModule<R>[];
   commands?: CommandDescriptor[];
   templates?: TemplateDescriptor[];
   references?: ReferenceEntry[];
+  /**
+   * Редакторы объектов: имя (ObjectModule.editor) → компонент. Ядро
+   * открывает его двойным щелчком по объекту или по запросу инструмента.
+   */
+  editors?: Record<string, (props: PluginEditorProps) => R>;
+  /**
+   * Редакторы, которые открываются и без права изменения объекта — только
+   * для просмотра (PluginEditorProps.readOnly): вращение 3D-сцены.
+   */
+  viewers?: string[];
   /** Обработчики заданий Web Worker: имя задания → фабрика воркера. */
   workers?: Record<string, WorkerFactory>;
 }

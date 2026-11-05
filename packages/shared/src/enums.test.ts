@@ -9,6 +9,7 @@ import {
   EDUCATION_LEVELS,
   USER_ROLES,
 } from './enums.js';
+import { AUDIT_ACTIONS } from './api/admin.js';
 
 const schemaPath = fileURLToPath(new URL('../../../backend/prisma/schema.prisma', import.meta.url));
 const schema = readFileSync(schemaPath, 'utf8');
@@ -30,6 +31,7 @@ describe('enum-ы совпадают с Prisma', () => {
     ['BoardMemberRole', BOARD_MEMBER_ROLES],
     ['AssignmentWorkStatus', ASSIGNMENT_WORK_STATUSES],
     ['EducationLevel', EDUCATION_LEVELS],
+    ['AuditAction', AUDIT_ACTIONS],
   ])('%s', (name, values) => {
     expect(prismaEnum(name)).toEqual([...values]);
   });

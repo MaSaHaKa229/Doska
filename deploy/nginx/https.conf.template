@@ -1,0 +1,39 @@
+# Сайт по HTTPS (домен ${DOMAIN}, сертификат Let's Encrypt). HTTP — только
+# для продления сертификата и перенаправления на HTTPS.
+map $scheme $hsts {
+    https "max-age=31536000";
+    default "";
+}
+
+server {
+    # Только IPv4: в контейнерах Docker IPv6 по умолчанию выключен (подключения
+    # по IPv6 к серверу пробрасывает сам Docker).
+    listen 80 default_server;
+    server_name _;
+    server_tokens off;
+
+    location /.well-known/acme-challenge/ {
+        root /var/www/certbot;
+    }
+    location / {
+        return 301 https://$host$request_uri;
+    }
+}
+
+server {
+    listen 443 ssl;
+    http2 on;
+    server_name ${DOMAIN};
+    server_tokens off;
+
+    ssl_certificate /etc/letsencrypt/live/${DOMAIN}/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/${DOMAIN}/privkey.pem;
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_prefer_server_ciphers off;
+    ssl_session_cache shared:SSL:10m;
+    ssl_session_timeout 1d;
+
+    # HSTS: для сайта — в общих правилах ($hsts), для /api и /ws его ставит сам сервер.
+
+    include /etc/nginx/doska/locations.conf;
+}

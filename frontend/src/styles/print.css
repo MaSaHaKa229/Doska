@@ -1,0 +1,66 @@
+/* Печать листков с логинами и временными паролями. */
+.print-only {
+  display: none;
+}
+.cred-sheet {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 12px;
+}
+.cred-card {
+  padding: 14px 16px;
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius);
+  background: var(--surface);
+  break-inside: avoid;
+  page-break-inside: avoid;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.cred-card__name {
+  font-weight: 700;
+}
+.cred-card__secret {
+  font-family: var(--font-mono);
+  font-size: 1.05rem;
+}
+
+@media print {
+  @page {
+    size: A4;
+    margin: 12mm;
+  }
+  :root {
+    --surface: #fff;
+    --text: #000;
+    --border-strong: #888;
+  }
+  body {
+    background: #fff;
+    color: #000;
+  }
+  .no-print,
+  .topbar,
+  .sidenav,
+  .toasts {
+    display: none !important;
+  }
+  .print-only {
+    display: block;
+  }
+  .admin {
+    display: block;
+  }
+  .page {
+    padding: 0;
+    max-width: none;
+  }
+  .cred-sheet {
+    grid-template-columns: 1fr 1fr;
+    gap: 6mm;
+  }
+  .cred-card {
+    border-color: #888;
+  }
+}

@@ -151,6 +151,12 @@ describe('конспекты, задания, шаблоны', () => {
     );
     expect(closed).toMatchObject({ write: false, noWriteReason: 'assignment-closed' });
 
+    const submitted = computeCapabilities(
+      facts({ kind: 'ASSIGNMENT_WORK', assignment: { studentId: STUDENT, closed: false, submitted: true } }),
+    );
+    expect(submitted).toMatchObject({ write: false, managePages: false, noWriteReason: 'assignment-submitted', raiseHand: true });
+    expect(noWriteHint('assignment-submitted')).toMatch(/сдана на проверку/);
+
     const stranger = computeCapabilities(
       facts({ kind: 'ASSIGNMENT_WORK', userId: 'other', assignment: { studentId: STUDENT, closed: false } }),
     );

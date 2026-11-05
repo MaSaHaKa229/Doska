@@ -1,0 +1,16 @@
+# В контекст сборки — только исходники: без зависимостей, сборок, данных и секретов.
+**/node_modules
+**/dist
+**/coverage
+**/*.tsbuildinfo
+.git
+.env
+.env.*
+!.env.example
+data
+backend/data
+backups
+e2e
+services
+docs
+*.log
