@@ -8,7 +8,7 @@ import { toast } from '../../store/toast';
 import { Button } from '../../ui/Button';
 
 /** Меню «Вид»: тема интерфейса, меловая доска страницы, привязки, режим «только перо». */
-export function ViewMenu({ model, onHelp }: { model: BoardModel; onHelp: () => void }) {
+export function ViewMenu({ model, onHelp, onExport }: { model: BoardModel; onHelp: () => void; onExport: () => void }) {
   const prefs = useAuth((s) => s.user?.preferences);
   const update = useAuth((s) => s.updatePreferences);
   const pageId = useBoard((s) => s.pageId);
@@ -59,6 +59,18 @@ export function ViewMenu({ model, onHelp }: { model: BoardModel; onHelp: () => v
             Планшет
           </div>
           {item(prefs.penOnly, 'Только перо: пальцем — двигать доску', () => save({ penOnly: !prefs.penOnly }))}
+          <button
+            type="button"
+            role="menuitem"
+            className="menu__item"
+            onClick={() => {
+              setOpen(false);
+              onExport();
+            }}
+          >
+            <span style={{ width: 16 }} />
+            Экспорт: PNG, SVG, PDF… (Ctrl+Shift+E)
+          </button>
           <button
             type="button"
             role="menuitem"

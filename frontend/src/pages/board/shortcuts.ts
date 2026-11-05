@@ -23,7 +23,7 @@ export function hotkeyOf(e: KeyboardEvent): string {
  * Горячие клавиши доски. Буквы определяются по физической клавише
  * (e.code), поэтому работают и в русской раскладке.
  */
-export function useBoardShortcuts(commands: BoardCommands | null, ui: { palette: () => void; help: () => void }): void {
+export function useBoardShortcuts(commands: BoardCommands | null, ui: { palette: () => void; help: () => void; export: () => void }): void {
   useEffect(() => {
     if (!commands) return;
     const store = () => useBoard.getState();
@@ -45,6 +45,7 @@ export function useBoardShortcuts(commands: BoardCommands | null, ui: { palette:
         fn();
       };
       if (ctrl && code === 'KeyK') return handled(() => ui.palette());
+      if (ctrl && e.shiftKey && code === 'KeyE') return handled(() => ui.export());
       if (e.key === '?' || (e.shiftKey && code === 'Slash') || code === 'F1') return handled(() => ui.help());
       if (ctrl && code === 'KeyZ') return handled(() => (e.shiftKey ? commands.redo() : commands.undo()));
       if (ctrl && code === 'KeyY') return handled(() => commands.redo());
