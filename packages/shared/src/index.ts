@@ -19,3 +19,5 @@ export * from './api/admin.js';
 export * from './api/boards.js';
 export * from './api/assignments.js';
 export * from './api/assets.js';
+export * from './api/templates.js';
+export * from './templates/builtin.js';

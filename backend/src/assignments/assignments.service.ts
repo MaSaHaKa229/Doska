@@ -217,7 +217,9 @@ export class AssignmentsService {
     this.requireTeacher(user);
     const access = await loadBoardAccess(this.prisma, user, input.templateBoardId);
     if (!access || !access.caps.view) throw Errors.validation({ templateBoardId: ['Доска не найдена'] });
-    if (!access.caps.manageLesson || (access.board.kind !== 'LESSON' && access.board.kind !== 'TEMPLATE')) {
+    // Шаблон библиотеки, видимый учителю (в том числе встроенный), раздаётся и без прав на изменение.
+    const ok = access.board.kind === 'TEMPLATE' ? access.caps.view : access.caps.manageLesson && access.board.kind === 'LESSON';
+    if (!ok) {
       throw Errors.validation({ templateBoardId: ['Раздать можно свою доску урока или шаблон'] });
     }
     if (input.classId) await this.assertTeacherClass(user, input.classId);

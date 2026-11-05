@@ -1,4 +1,4 @@
-import { useEffect, useRef, type FormEvent, type ReactNode } from 'react';
+import { useEffect, useId, useRef, type FormEvent, type ReactNode } from 'react';
 import { X } from 'lucide-react';
 import { Button } from './Button';
 
@@ -21,6 +21,7 @@ export interface DialogProps {
  */
 export function Dialog({ open, onClose, title, children, footer, wide, onSubmit, busy }: DialogProps) {
   const ref = useRef<HTMLDialogElement>(null);
+  const titleId = useId();
 
   useEffect(() => {
     const d = ref.current;
@@ -37,7 +38,7 @@ export function Dialog({ open, onClose, title, children, footer, wide, onSubmit,
   const content = (
     <>
       <div className="dialog__header">
-        <h2 style={{ flex: 1 }}>{title}</h2>
+        <h2 id={titleId} style={{ flex: 1 }}>{title}</h2>
         <Button variant="ghost" iconOnly icon={<X size={18} />} aria-label="Закрыть" onClick={onClose} disabled={busy} />
       </div>
       <div className="dialog__body">{children}</div>
@@ -47,6 +48,7 @@ export function Dialog({ open, onClose, title, children, footer, wide, onSubmit,
 
   return (
     <dialog
+      aria-labelledby={titleId}
       ref={ref}
       className={['dialog', wide && 'dialog--wide'].filter(Boolean).join(' ')}
       onCancel={(e) => {

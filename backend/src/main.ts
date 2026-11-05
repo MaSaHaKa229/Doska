@@ -1,4 +1,5 @@
 import { buildApp } from './app.js';
+import { ensureBuiltinTemplates } from './templates/builtin.js';
 import { ConfigError, loadConfig } from './config/env.js';
 
 async function main(): Promise<void> {
@@ -14,6 +15,14 @@ async function main(): Promise<void> {
   }
 
   const app = await buildApp({ config });
+
+  // Встроенные шаблоны библиотеки: недостающие создаются при каждом запуске (по ключу).
+  try {
+    const created = await ensureBuiltinTemplates(app.prisma);
+    if (created) app.log.info({ created }, 'Созданы встроенные шаблоны');
+  } catch (err) {
+    app.log.error({ err }, 'Не удалось создать встроенные шаблоны');
+  }
 
   // Корректное завершение: дождаться текущих запросов, закрыть соединения с БД.
   let closing = false;

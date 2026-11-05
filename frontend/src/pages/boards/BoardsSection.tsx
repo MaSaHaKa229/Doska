@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
+  BookOpen,
   Folder,
   FolderInput,
   FolderPlus,
@@ -31,6 +32,7 @@ import { descendantsOf, flattenFolders } from './folderTree';
 import { AccessDialog } from './AccessDialog';
 import { CreateAssignmentDialog } from '../assignments/CreateAssignmentDialog';
 import { BoardSnapshotThumb } from '../../ui/Thumbs';
+import { TemplateDialog } from '../library/TemplateDialog';
 
 const PAGE_SIZE = 24;
 
@@ -73,6 +75,7 @@ export function BoardsSection({ user }: { user: Me }) {
   const [deleting, setDeleting] = useState<BoardSummary | null>(null);
   const [accessFor, setAccessFor] = useState<BoardSummary | null>(null);
   const [assignFrom, setAssignFrom] = useState<BoardSummary | null>(null);
+  const [savingTemplate, setSavingTemplate] = useState<BoardSummary | null>(null);
   /** Конспект ученика: открыть или скрыть от учителей его классов. */
   const toggleShared = async (b: BoardSummary) => {
     try {
@@ -242,6 +245,12 @@ export function BoardsSection({ user }: { user: Me }) {
                           onSelect: () => setAssignFrom(b),
                         },
                         {
+                          label: 'Сохранить как шаблон…',
+                          icon: <BookOpen size={16} />,
+                          hidden: !isTeacher || b.kind !== 'LESSON',
+                          onSelect: () => setSavingTemplate(b),
+                        },
+                        {
                           label: b.sharedWithTeachers ? 'Скрыть от учителей' : 'Открыть учителям',
                           icon: b.sharedWithTeachers ? <EyeOff size={16} /> : <Eye size={16} />,
                           hidden: b.kind !== 'NOTEBOOK' || b.role !== 'owner',
@@ -276,6 +285,7 @@ export function BoardsSection({ user }: { user: Me }) {
         }}
       />
       <CreateAssignmentDialog open={!!assignFrom} board={assignFrom} onClose={() => setAssignFrom(null)} />
+      <TemplateDialog open={!!savingTemplate} board={savingTemplate} onClose={() => setSavingTemplate(null)} />
       {accessFor && (
         <AccessDialog boardId={accessFor.id} title={accessFor.title} open onClose={() => setAccessFor(null)} onSaved={() => list.reload()} />
       )}

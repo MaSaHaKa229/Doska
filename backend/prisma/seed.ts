@@ -1,6 +1,7 @@
 /**
  * Сид: создаёт первого администратора из переменных окружения, если в базе
- * ещё нет ни одного действующего администратора. Повторный запуск безопасен.
+ * ещё нет ни одного действующего администратора, и встроенные шаблоны
+ * библиотеки. Повторный запуск безопасен.
  *
  *   SEED_ADMIN_LOGIN       логин (по умолчанию admin)
  *   SEED_ADMIN_PASSWORD    начальный пароль (обязателен; не короче 8 символов,
@@ -13,6 +14,7 @@
 import { PrismaClient } from '@prisma/client';
 import { checkPasswordPolicy, loginFieldSchema } from '@doska/shared';
 import { PasswordHasher } from '../src/auth/password.js';
+import { ensureBuiltinTemplates } from '../src/templates/builtin.js';
 
 async function main(): Promise<void> {
   const loginRaw = process.env.SEED_ADMIN_LOGIN || 'admin';
@@ -29,7 +31,8 @@ async function main(): Promise<void> {
   try {
     const existingAdmin = await prisma.user.findFirst({ where: { role: 'ADMIN', deletedAt: null } });
     if (existingAdmin) {
-      console.log(`Администратор уже существует (логин: ${existingAdmin.login}) — сид пропущен.`);
+      console.log(`Администратор уже существует (логин: ${existingAdmin.login}) — создание пропущено.`);
+      await seedTemplates(prisma);
       return;
     }
     if (!password) {
@@ -68,9 +71,16 @@ async function main(): Promise<void> {
       },
     });
     console.log(`Создан администратор «${login}». При первом входе потребуется сменить пароль.`);
+    await seedTemplates(prisma);
   } finally {
     await prisma.$disconnect();
   }
+}
+
+/** Встроенные шаблоны библиотеки (их владелец — администратор; сервер тоже досоздаёт их при запуске). */
+async function seedTemplates(prisma: PrismaClient): Promise<void> {
+  const created = await ensureBuiltinTemplates(prisma);
+  if (created) console.log(`Созданы встроенные шаблоны: ${created}.`);
 }
 
 main().catch((err: unknown) => {

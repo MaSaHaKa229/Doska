@@ -103,7 +103,8 @@ export class BoardsService {
   async list(user: BoardUser, q: ListBoardsQuery): Promise<Paginated<BoardSummary>> {
     const and: Prisma.BoardWhereInput[] = [{ deletedAt: null }];
     // Работы по заданиям показываются в разделе «Задания» (учителю и ученику), не в общем списке досок.
-    const ownWhere: Prisma.BoardWhereInput = { ownerId: user.id, kind: { not: 'ASSIGNMENT_WORK' } };
+    // Доски шаблонов — в библиотеке (/api/templates), в общий список попадают только по фильтру kind = TEMPLATE.
+    const ownWhere: Prisma.BoardWhereInput = { ownerId: user.id, kind: q.kind === 'TEMPLATE' ? 'TEMPLATE' : { notIn: ['ASSIGNMENT_WORK', 'TEMPLATE'] } };
     if (user.role === 'ADMIN') {
       // Администратор видит все доски (только просмотр).
       if (q.scope === 'own') and.push(ownWhere);
