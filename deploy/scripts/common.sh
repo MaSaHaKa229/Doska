@@ -12,8 +12,15 @@ warn() { printf '\033[33m%s\033[0m\n' "$*" >&2; }
 die() { printf '\033[31mОшибка: %s\033[0m\n' "$*" >&2; exit 1; }
 
 compose() {
+  local files=()
+  # Сертификат прокси для npm при сборке (необязательно): DOSKA_NPM_CA=/путь/ca.pem.
+  if [ -n "${DOSKA_NPM_CA:-}" ]; then
+    [ -r "$DOSKA_NPM_CA" ] || die "Не читается DOSKA_NPM_CA: $DOSKA_NPM_CA"
+    DOSKA_NPM_CA_PEM=$(cat "$DOSKA_NPM_CA"); export DOSKA_NPM_CA_PEM
+    files=(-f "$ROOT/docker-compose.yml" -f "$ROOT/docker-compose.npm-ca.yml")
+  fi
   # shellcheck disable=SC2086
-  docker compose --project-directory "$ROOT" --env-file "$ENV_FILE" ${DOSKA_COMPOSE_ARGS:-} "$@"
+  docker compose --project-directory "$ROOT" "${files[@]}" --env-file "$ENV_FILE" ${DOSKA_COMPOSE_ARGS:-} "$@"
 }
 
 require_docker() {

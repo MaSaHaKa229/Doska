@@ -42,7 +42,6 @@ services:
     build:
       context: .
       target: backend
-      secrets: [npm_ca]
       args:
         PRISMA_ENGINES_MIRROR: ${PRISMA_ENGINES_MIRROR:-}
     image: doska/backend:${DOSKA_VERSION:-latest}
@@ -71,7 +70,6 @@ services:
     build:
       context: .
       target: web
-      secrets: [npm_ca]
       args:
         PRISMA_ENGINES_MIRROR: ${PRISMA_ENGINES_MIRROR:-}
     image: doska/web:${DOSKA_VERSION:-latest}
@@ -126,7 +124,7 @@ volumes:
   certbot-www:
   letsencrypt:
 
-# Сертификат прокси для npm при сборке (необязательно): DOSKA_NPM_CA=/путь/ca.pem.
-secrets:
-  npm_ca:
-    file: ${DOSKA_NPM_CA:-/dev/null}
+# Сертификат прокси для npm при сборке (необязательно, за корпоративным прокси):
+# DOSKA_NPM_CA=/путь/ca.pem — скрипты deploy/scripts подключают docker-compose.npm-ca.yml.
+# Здесь секрет не объявлен: новый Docker Compose (сборка через bake) требует для
+# секрета-файла разрешение --allow=fs.read, которое из compose не передать.

@@ -3,6 +3,7 @@
 #   docker compose build            — собирает оба (см. docker-compose.yml)
 # Сертификат прокси при сборке за корпоративным прокси (необязательно):
 #   docker build --secret id=npm_ca,src=/путь/ca.pem …
+#   (через скрипты deploy/scripts — DOSKA_NPM_CA=/путь/ca.pem, см. docker-compose.npm-ca.yml)
 # Зеркало движков Prisma, если binaries.prisma.sh недоступен (необязательно):
 #   PRISMA_ENGINES_MIRROR в .env (передаётся сюда аргументом сборки).
 
@@ -27,7 +28,7 @@ COPY frontend/package.json frontend/
 COPY backend/prisma backend/prisma
 RUN --mount=type=cache,target=/root/.npm \
     --mount=type=secret,id=npm_ca,required=false \
-    sh -c '[ -n "$PRISMA_ENGINES_MIRROR" ] || unset PRISMA_ENGINES_MIRROR; if [ -f /run/secrets/npm_ca ]; then export NODE_EXTRA_CA_CERTS=/run/secrets/npm_ca; fi; npm ci'
+    sh -c '[ -n "$PRISMA_ENGINES_MIRROR" ] || unset PRISMA_ENGINES_MIRROR; if [ -s /run/secrets/npm_ca ]; then export NODE_EXTRA_CA_CERTS=/run/secrets/npm_ca; fi; npm ci'
 COPY tsconfig.base.json ./
 COPY packages/shared packages/shared
 COPY backend backend
@@ -47,7 +48,7 @@ COPY backend/package.json backend/
 COPY backend/prisma backend/prisma
 RUN --mount=type=cache,target=/root/.npm \
     --mount=type=secret,id=npm_ca,required=false \
-    sh -c '[ -n "$PRISMA_ENGINES_MIRROR" ] || unset PRISMA_ENGINES_MIRROR; if [ -f /run/secrets/npm_ca ]; then export NODE_EXTRA_CA_CERTS=/run/secrets/npm_ca; fi; npm ci --omit=dev -w @doska/backend -w @doska/shared --include-workspace-root=false'
+    sh -c '[ -n "$PRISMA_ENGINES_MIRROR" ] || unset PRISMA_ENGINES_MIRROR; if [ -s /run/secrets/npm_ca ]; then export NODE_EXTRA_CA_CERTS=/run/secrets/npm_ca; fi; npm ci --omit=dev -w @doska/backend -w @doska/shared --include-workspace-root=false'
 COPY --from=build /app/packages/shared/dist packages/shared/dist
 COPY --from=build /app/backend/dist backend/dist
 COPY deploy/backend-entrypoint.sh /usr/local/bin/doska-backend

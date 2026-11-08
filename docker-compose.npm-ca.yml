@@ -1,0 +1,15 @@
+# Сертификат прокси для npm при сборке (только за прокси с подменой сертификатов).
+# Подключается скриптами deploy/scripts, если задан DOSKA_NPM_CA=/путь/ca.pem:
+# содержимое передаётся через переменную DOSKA_NPM_CA_PEM (секрет из переменной
+# не требует разрешения на чтение файлов при сборке через bake).
+services:
+  backend:
+    build:
+      secrets: [npm_ca]
+  web:
+    build:
+      secrets: [npm_ca]
+
+secrets:
+  npm_ca:
+    environment: DOSKA_NPM_CA_PEM
