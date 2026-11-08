@@ -5,8 +5,12 @@
 #   ./deploy/scripts/install.sh                       с вопросами
 #   ./deploy/scripts/install.sh --domain doska.school.ru --email it@school.ru
 #   ./deploy/scripts/install.sh --ip 192.168.1.10     локальная сеть, без домена
+#   ./deploy/scripts/install.sh --behind-proxy https://doska.school.ru --local-port 8080
+#        за чужим прокси (Caddy, Nginx) на этом же сервере: он держит порты 80/443
+#        и HTTPS, а сайт слушает только 127.0.0.1:8080
 #
-# Ключи: --domain ДОМЕН --email ПОЧТА | --ip АДРЕС; --admin-login ЛОГИН;
+# Ключи: --domain ДОМЕН --email ПОЧТА | --ip АДРЕС | --behind-proxy АДРЕС
+# [--local-port N, по умолчанию 8080]; --admin-login ЛОГИН;
 # --admin-password ПАРОЛЬ (иначе — случайный); --http-port N --https-port N;
 # --ocr (распознавание рукописных формул, нужно ~3 ГБ памяти);
 # --prisma-mirror АДРЕС (зеркало движков Prisma, если binaries.prisma.sh недоступен);
@@ -14,12 +18,14 @@
 set -euo pipefail
 . "$(dirname "$0")/common.sh"
 
-DOMAIN_ARG='' EMAIL_ARG='' IP_ARG='' ADMIN_LOGIN='admin' ADMIN_PASSWORD='' HTTP_PORT_ARG=80 HTTPS_PORT_ARG=443 OCR=0 BUILD=1 FORCE=0 PRISMA_MIRROR=''
+DOMAIN_ARG='' EMAIL_ARG='' IP_ARG='' ADMIN_LOGIN='admin' ADMIN_PASSWORD='' HTTP_PORT_ARG=80 HTTPS_PORT_ARG=443 OCR=0 BUILD=1 FORCE=0 PRISMA_MIRROR='' PROXY_ARG='' LOCAL_PORT=8080
 while [ $# -gt 0 ]; do
   case "$1" in
     --domain) DOMAIN_ARG=$2; shift 2 ;;
     --email) EMAIL_ARG=$2; shift 2 ;;
     --ip) IP_ARG=$2; shift 2 ;;
+    --behind-proxy) PROXY_ARG=$2; shift 2 ;;
+    --local-port) LOCAL_PORT=$2; shift 2 ;;
     --admin-login) ADMIN_LOGIN=$2; shift 2 ;;
     --admin-password) ADMIN_PASSWORD=$2; shift 2 ;;
     --http-port) HTTP_PORT_ARG=$2; shift 2 ;;
@@ -28,7 +34,7 @@ while [ $# -gt 0 ]; do
     --prisma-mirror) PRISMA_MIRROR=$2; shift 2 ;;
     --no-build) BUILD=0; shift ;;
     --force) FORCE=1; shift ;;
-    -h|--help) sed -n '2,13p' "$0"; exit 0 ;;
+    -h|--help) sed -n '2,17p' "$0"; exit 0 ;;
     *) die "Неизвестный ключ: $1 (справка: --help)" ;;
   esac
 done
@@ -40,7 +46,7 @@ if [ -f "$ENV_FILE" ] && [ $FORCE -ne 1 ]; then
 fi
 
 # --- Адрес сайта -------------------------------------------------------
-if [ -z "$DOMAIN_ARG" ] && [ -z "$IP_ARG" ]; then
+if [ -z "$DOMAIN_ARG" ] && [ -z "$IP_ARG" ] && [ -z "$PROXY_ARG" ]; then
   echo "Как будут открывать сайт?"
   echo "  1) по доменному имени (например, doska.school.ru) — с HTTPS"
   echo "  2) по IP-адресу в локальной сети — без домена, по HTTP"
@@ -54,7 +60,17 @@ if [ -z "$DOMAIN_ARG" ] && [ -z "$IP_ARG" ]; then
     IP_ARG=${IP_ARG:-$guess}
   fi
 fi
-if [ -n "$DOMAIN_ARG" ]; then
+if [ -n "$PROXY_ARG" ]; then
+  # Внешний прокси принимает HTTPS и передаёт запросы на 127.0.0.1:LOCAL_PORT.
+  [ -z "$DOMAIN_ARG" ] && [ -z "$IP_ARG" ] || die "--behind-proxy не совмещается с --domain и --ip"
+  [[ "$PROXY_ARG" =~ ^https?://[A-Za-z0-9.-]+(:[0-9]+)?$ ]] || die "Адрес для --behind-proxy — вида https://doska.example.ru (без / в конце): $PROXY_ARG"
+  [[ "$LOCAL_PORT" =~ ^[0-9]+$ ]] && [ "$LOCAL_PORT" -ge 1024 ] && [ "$LOCAL_PORT" -le 65000 ] || die "--local-port — число от 1024 до 65000"
+  ORIGIN=$PROXY_ARG
+  case "$PROXY_ARG" in https://*) COOKIE_SECURE=true ;; *) COOKIE_SECURE=false ;; esac
+  # Оба порта — только на 127.0.0.1: снаружи сайт доступен лишь через прокси.
+  HTTP_PORT_ARG="127.0.0.1:$LOCAL_PORT"
+  HTTPS_PORT_ARG="127.0.0.1:$((LOCAL_PORT + 1))"
+elif [ -n "$DOMAIN_ARG" ]; then
   [[ "$DOMAIN_ARG" =~ ^[A-Za-z0-9.-]+\.[A-Za-z]{2,}$ ]] || die "Странный домен: $DOMAIN_ARG"
   [ -n "$EMAIL_ARG" ] || die "Для HTTPS нужна почта: --email"
   [ "$HTTP_PORT_ARG" = 80 ] || warn "Let's Encrypt проверяет домен по порту 80 — сертификат может не выпуститься."
@@ -136,6 +152,12 @@ fi
 
 echo
 say "Учебная доска установлена: $ORIGIN"
+if [ -n "$PROXY_ARG" ]; then
+  echo "  Сайт слушает http://127.0.0.1:$LOCAL_PORT — настройте прокси, например в Caddyfile:"
+  echo "    ${PROXY_ARG#*://} {"
+  echo "        reverse_proxy 127.0.0.1:$LOCAL_PORT"
+  echo "    }"
+fi
 echo "  Администратор: $ADMIN_LOGIN"
 if [ $GENERATED -eq 1 ]; then
   echo "  Пароль:        $ADMIN_PASSWORD   (запишите; при первом входе система попросит его сменить)"
